@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UnlimitedMC — макет v6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  @property --accent{syntax:"<color>";inherits:true;initial-value:#4C8DFF;}
+  :root{
+    --bg:#090A0F; --surface:rgba(255,255,255,.035); --surface-2:rgba(255,255,255,.06);
+    --border:rgba(255,255,255,.07); --border-strong:rgba(255,255,255,.12);
+    --text:#E7EAF2; --muted:#8A92A6; --panel:#0b0d13; --elevated:#0e111a;
+    --radius:14px; --accent:#4C8DFF;
+    --grad:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent),#000 38%));
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+  }
+  [data-theme="light"]{
+    --bg:#EDF0F6; --surface:rgba(0,0,0,.04); --surface-2:rgba(0,0,0,.06);
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.17);
+    --text:#0F1320; --muted:#5C6376; --panel:#FFFFFF; --elevated:#FFFFFF;
+  }
+  html{transition:--accent .55s ease}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;transition:background .4s,color .4s}
+
+  .ambient{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .glow{position:absolute;inset:-8%;animation:drift 22s ease-in-out infinite alternate;
+    background:radial-gradient(1000px 640px at 10% -8%,color-mix(in srgb,var(--accent) 32%,transparent),transparent 60%),
+               radial-gradient(900px 760px at 102% 112%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 55%);}
+  [data-theme="light"] .glow{
+    background:radial-gradient(1000px 640px at 10% -8%,color-mix(in srgb,var(--accent) 48%,transparent),transparent 64%),
+               radial-gradient(900px 760px at 102% 112%,color-mix(in srgb,var(--accent) 40%,transparent),transparent 58%);}
+  @keyframes drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-3%,2%,0) scale(1.07)}}
+
+  .window{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column}
+  .titlebar{height:44px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--border);backdrop-filter:blur(6px)}
+  .hamburger{display:none;width:30px;height:30px;border-radius:8px;place-items:center;cursor:pointer;border:1px solid var(--border)}
+  .hamburger svg{width:18px;height:18px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:24px;height:24px;display:grid;place-items:center}
+  .logo svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent) 45%,transparent))}
+  .logo .lgs1{stop-color:color-mix(in srgb,var(--accent),#fff 20%)}
+  .logo .lgs2{stop-color:color-mix(in srgb,var(--accent),#000 42%)}
+  .wordmark{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:.3px;font-size:15px}
+  .wordmark b{color:var(--accent)}
+  .wctrl{margin-left:auto;display:flex;gap:9px}
+  .wctrl span{width:13px;height:13px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border)}
+  .wctrl span:last-child{background:#e2533f55;border-color:#e2533f66}
+
+  .shell{flex:1;display:grid;grid-template-columns:70px 1fr;min-height:0;position:relative}
+
+  .side{position:absolute;left:0;top:0;bottom:0;width:70px;z-index:20;background:var(--panel);border-right:1px solid var(--border);padding:14px 11px;display:flex;flex-direction:column;gap:5px;overflow-x:hidden;overflow-y:auto;transition:width .25s cubic-bezier(.4,0,.2,1),box-shadow .25s}
+  .side:hover{width:238px;box-shadow:30px 0 60px rgba(0,0,0,.35)}
+  .side-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);padding:13px 10px 5px;white-space:nowrap;opacity:0;transition:opacity .2s}
+  .side:hover .side-label{opacity:1}
+  .nav{position:relative;z-index:1;display:flex;align-items:center;gap:13px;padding:11px;border-radius:10px;color:var(--muted);cursor:pointer;font-size:14px;font-weight:500;border:1px solid transparent;white-space:nowrap;transition:background .15s,color .15s}
+  .nav:hover{background:var(--surface);color:var(--text)}
+  .nav svg{width:18px;height:18px;flex:none}
+  .nav .lbl{opacity:0;transition:opacity .2s}
+  .side:hover .nav .lbl{opacity:1}
+  .nav.active{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--text);border-color:var(--border-strong)}
+  .nav.active svg{color:var(--accent)}
+  .side-bottom{margin-top:auto;display:flex;flex-direction:column;gap:7px}
+  .account{position:relative;display:flex;align-items:center;gap:12px;padding:9px;border-radius:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;white-space:nowrap}
+  .account:hover{border-color:var(--border-strong)}
+  .avatar{position:relative;--st:#2FD06E;width:34px;height:34px;border-radius:8px;flex:none;background:linear-gradient(135deg,#3b6,#185);background-size:cover;background-position:center;display:grid;place-items:center;font-weight:700;font-size:14px;color:#06210f}
+  .avatar::after{content:"";position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:var(--st);border:2px solid var(--panel)}
+  .who-wrap{opacity:0;transition:opacity .2s;min-width:0}
+  .side:hover .who-wrap{opacity:1}
+  .who{font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+  .tag{font-size:11px;color:var(--muted)}
+
+  .main{overflow-y:auto;grid-column:2}
+  .topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 28px;background:linear-gradient(var(--bg),color-mix(in srgb,var(--bg) 35%,transparent));backdrop-filter:blur(8px)}
+  .page-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600}
+  .page-sub{font-size:13px;color:var(--muted);margin-top:2px}
+  .search{display:none;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:9px 13px;min-width:240px;color:var(--muted);font-size:13px}
+  .search svg{width:16px;height:16px}
+  .content{padding:8px 28px 44px}
+
+  .view{display:none}
+  .view.active{display:block;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+  .hero{position:relative;overflow:hidden;border:1px solid var(--border-strong);border-radius:20px;padding:32px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 16%,transparent),transparent 70%),var(--surface);margin-bottom:26px}
+  .hero h1{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;min-height:38px}
+  .hero-row{display:flex;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap}
+  .select{display:flex;align-items:center;gap:10px;background:color-mix(in srgb,var(--text) 6%,transparent);border:1px solid var(--border-strong);border-radius:12px;padding:11px 15px;font-size:14px;font-weight:500;cursor:pointer}
+  .select small{color:var(--muted);font-weight:400}
+  .btn-play{display:flex;align-items:center;gap:10px;background:var(--grad);color:#fff;border:none;border-radius:12px;padding:13px 32px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 8px 30px color-mix(in srgb,var(--accent) 30%,transparent);font-family:inherit;transition:transform .12s}
+  .btn-play:hover{transform:translateY(-2px)}
+  .btn-play svg{width:18px;height:18px}
+
+  .section-h{display:flex;align-items:center;justify-content:space-between;margin:10px 2px 14px}
+  .section-h h3{font-size:15px;font-weight:600}
+  .section-h a{font-size:13px;color:var(--accent);cursor:pointer}
+  .set-h{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:600;margin:8px 2px 12px}
+  .set-h+.set-h,.opt+.set-h{margin-top:24px}
+
+  .news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:26px}
+  .news{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);cursor:pointer;transition:.18s;animation:rise .45s ease both}
+  .news:hover{transform:translateY(-4px);border-color:var(--border-strong)}
+  .news .cover{height:118px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 18%,transparent),color-mix(in srgb,var(--accent) 6%,transparent));display:grid;place-items:center;font-size:36px}
+  .news .nbody{padding:13px 15px}
+  .news .ntag{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .news h4{font-size:14.5px;margin:6px 0 5px}
+  .news p{font-size:12.5px;color:var(--muted);line-height:1.45}
+
+  .row{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .inst{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);transition:.18s;animation:rise .45s ease both}
+  .inst:hover{border-color:var(--border-strong)}
+  .inst .thumb{height:100px;background:linear-gradient(135deg,color-mix(in srgb,var(--text) 8%,transparent),transparent);display:grid;place-items:center;font-size:32px}
+  .inst .meta{padding:12px 14px}
+  .inst .meta b{font-size:14px;display:block;margin-bottom:3px}
+  .inst .meta span{font-size:12px;color:var(--muted)}
+  .inst-actions{display:flex;gap:8px;margin-top:11px;align-items:center}
+  .btn-launch{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);border:1px solid var(--border-strong);border-radius:9px;padding:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+  .btn-launch:hover{background:var(--accent);color:#fff}
+  .inst-del{background:var(--surface);border:1px solid var(--border);border-radius:9px;width:34px;height:34px;flex:none;cursor:pointer;color:var(--muted);font-size:14px}
+  .inst-del:hover{color:#ff7a90;border-color:#ff7a9055}
+  .empty{grid-column:1/-1;text-align:center;padding:48px 20px;border:1px dashed var(--border-strong);border-radius:16px;background:var(--surface)}
+  .empty-emoji{font-size:40px;margin-bottom:12px}
+  .empty p{color:var(--muted);font-size:14px;margin-bottom:16px}
+
+  .acc-select{border:1px solid var(--border-strong);border-radius:16px;padding:18px 20px;background:var(--surface);margin-bottom:22px;animation:rise .4s ease both}
+  .acc-label{font-size:13px;color:var(--muted);margin-bottom:11px}
+  .acc-pane{display:none;margin-top:15px}
+  .acc-pane.on{display:block}
+  .acc-pane p{font-size:13px;color:var(--muted);margin-bottom:11px}
+  .mini-btn{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);border:1px solid var(--border-strong);border-radius:9px;padding:9px 17px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap}
+
+  .seg{display:inline-flex;gap:5px;background:color-mix(in srgb,var(--text) 8%,transparent);padding:5px;border-radius:11px;flex-wrap:wrap}
+  .seg-opt,.lang-opt,.theme-opt{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s}
+  .seg-opt.on,.lang-opt.on,.theme-opt.on{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--text)}
+  .lang-opt,.theme-opt{padding:7px 14px}
+
+  .chips{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:20px}
+  .chip{padding:8px 15px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-size:13px;color:var(--muted);cursor:pointer;transition:.15s}
+  .chip:hover{color:var(--text)}
+  .chip.on{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--border-strong);color:var(--text)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .mod{display:flex;gap:14px;padding:15px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);transition:.18s;cursor:pointer;animation:rise .4s ease both}
+  .mod:hover{border-color:var(--border-strong);transform:translateY(-3px)}
+  .mod .icon{width:52px;height:52px;border-radius:11px;flex:none;display:grid;place-items:center;font-size:24px;background:color-mix(in srgb,var(--accent) 16%,transparent)}
+  .mod .mbody{flex:1;min-width:0}
+  .mod h4{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mod h4 em{font-style:normal;font-size:12px;color:var(--muted);font-weight:400}
+  .mod p{font-size:12.5px;color:var(--muted);margin:5px 0 9px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .mfoot{display:flex;align-items:center;justify-content:space-between}
+  .dl{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .dl svg{width:13px;height:13px}
+  .install{font-size:12.5px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);border:1px solid var(--border-strong);border-radius:9px;padding:7px 14px;cursor:pointer;font-family:inherit;transition:.15s;min-width:104px}
+  .install.done{color:#fff;background:var(--grad);border-color:transparent}
+
+  .opt{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);margin-bottom:12px;animation:rise .4s ease both}
+  .opt .t{font-size:14px;font-weight:600}
+  .opt .d{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .swatches{display:flex;gap:9px;flex-wrap:wrap}
+  .sw{width:26px;height:26px;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:transform .12s}
+  .sw:hover{transform:scale(1.12)}
+  .sw.sel{border-color:var(--text)}
+  .toggle{width:44px;height:25px;border-radius:999px;background:color-mix(in srgb,var(--text) 14%,transparent);position:relative;cursor:pointer;flex:none;transition:background .2s}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:left .2s}
+  .toggle.on{background:var(--grad)}
+  .toggle.on::after{left:22px}
+  .otl{margin-top:12px;font-size:12.5px;color:var(--muted)}
+  .otl code{display:block;margin-top:6px;background:color-mix(in srgb,var(--text) 6%,transparent);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--accent);font-size:12px;word-break:break-all}
+
+  .ad{position:relative;margin-top:6px;border:1px dashed var(--border-strong);border-radius:var(--radius);padding:24px;text-align:center;overflow:hidden;background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--text) 3%,transparent) 0 12px,transparent 12px 24px)}
+  .ad::before{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--text) 8%,transparent),transparent);animation:shine 3.2s linear infinite}
+  @keyframes shine{to{left:120%}}
+  .ad b{font-size:15px}
+  .ad p{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .ad .x{position:absolute;top:9px;right:13px;color:var(--muted);cursor:pointer;font-size:16px}
+
+  .modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px;background:rgba(5,6,10,.6);backdrop-filter:blur(12px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .28s ease,visibility .28s ease}
+  .modal.show{opacity:1;visibility:visible;pointer-events:auto}
+  .modal>*{transform:scale(.93) translateY(14px);opacity:0;transition:transform .34s cubic-bezier(.34,1.4,.5,1),opacity .28s}
+  .modal.show>*{transform:none;opacity:1}
+
+  .m-card,.pick-card{width:min(520px,94vw);max-height:88vh;overflow-y:auto;background:var(--elevated);border:1px solid var(--border-strong);border-radius:20px;padding:26px;position:relative;box-shadow:0 40px 90px rgba(0,0,0,.45)}
+  .pick-card{width:min(440px,94vw)}
+  .m-close{position:absolute;top:15px;right:18px;color:var(--muted);cursor:pointer;font-size:16px;z-index:2}
+  .m-head{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+  .m-icon{width:64px;height:64px;border-radius:14px;flex:none;display:grid;place-items:center;font-size:30px;background:color-mix(in srgb,var(--accent) 16%,transparent)}
+  .m-head h3{font-family:'Space Grotesk',sans-serif;font-size:22px}
+  .m-author{color:var(--muted);font-size:13px;margin-top:2px}
+  .m-shots{display:flex;gap:10px;margin-bottom:18px;overflow-x:auto;padding-bottom:4px}
+  .shot{flex:none;width:170px;height:96px;border-radius:11px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 14%,transparent),color-mix(in srgb,var(--accent) 5%,transparent));display:grid;place-items:center;font-size:28px}
+  .m-desc{font-size:14px;color:var(--text);opacity:.9;line-height:1.6;margin-bottom:16px}
+  .m-meta{font-size:12.5px;color:var(--muted);margin-bottom:18px;line-height:1.7}
+  .m-install{width:100%;background:var(--grad);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:700;font-size:14.5px;cursor:pointer;font-family:inherit;transition:transform .12s}
+  .m-install:hover{transform:translateY(-1px)}
+  .field{margin-bottom:11px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .field input,.ci-select,.field textarea{width:100%;background:color-mix(in srgb,var(--text) 6%,transparent);border:1px solid var(--border-strong);border-radius:11px;padding:11px 13px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border .15s}
+  .field textarea{min-height:74px;resize:vertical;line-height:1.5}
+  .field input:focus,.ci-select:focus,.field textarea:focus{border-color:var(--accent)}
+  .ci-select option{background:var(--elevated);color:var(--text)}
+
+  .pick-card h3{font-family:'Space Grotesk',sans-serif;font-size:20px;margin-bottom:4px}
+  .pick-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .pick-list{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;max-height:300px;overflow-y:auto}
+  .pick-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer;transition:.15s}
+  .pick-row:hover{border-color:var(--border-strong)}
+  .pick-row b{font-size:14px;display:block}
+  .pick-row .pr-sub{font-size:12px;color:var(--muted)}
+  .pick-btn{font-size:12.5px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);border:1px solid var(--border-strong);border-radius:9px;padding:7px 14px;white-space:nowrap}
+  .pick-btn.on{color:#fff;background:var(--grad);border-color:transparent}
+  .pick-empty{text-align:center;color:var(--muted);font-size:13.5px;padding:18px 0 6px}
+
+  /* профиль */
+  .profile-card{width:min(460px,94vw);max-height:88vh;overflow-y:auto;background:var(--elevated);border:1px solid var(--border-strong);border-radius:20px;position:relative;box-shadow:0 40px 90px rgba(0,0,0,.45)}
+  .pf-header{height:172px;background:var(--grad);background-size:cover;background-position:center}
+  .pf-avatar{width:92px;height:92px;border-radius:22px;border:4px solid var(--bg);margin:-50px 0 0 24px;position:relative;background:linear-gradient(135deg,#3b6,#185);background-size:cover;background-position:center;display:grid;place-items:center;font-size:34px;font-weight:700;color:#06210f}
+  .pf-body{padding:14px 24px 28px}
+  .pf-name{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700}
+  .pf-user{color:var(--accent);font-size:14px;margin-top:2px}
+  .pf-bio{color:var(--muted);font-size:13.5px;line-height:1.55;margin-top:12px}
+  .pf-sec{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;margin:18px 0 9px}
+  .pf-mods,.pf-socials{display:flex;flex-wrap:wrap;gap:8px}
+  .pf-mod,.pf-soc{display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font-size:13px}
+  .pf-soc{cursor:pointer;transition:.15s}
+  .pf-soc:hover{border-color:var(--border-strong)}
+  .pf-edit{margin-top:22px}
+  .back-btn{display:inline-flex;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 15px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit;margin-bottom:18px;transition:border .15s}
+  .back-btn:hover{border-color:var(--border-strong)}
+  .profile-full{margin:-8px -28px 0}
+  .pf-back-full{display:flex;width:100%;justify-content:center;margin:20px 0 0}
+  .article{max-width:720px}
+  .art-cover{height:200px;border-radius:16px;background:var(--grad);display:grid;place-items:center;font-size:74px;margin-bottom:20px}
+  .art-tag{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent);font-weight:600;margin-bottom:8px}
+  .art-title{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;margin-bottom:8px;line-height:1.2}
+  .art-date{font-size:13px;color:var(--muted);margin-bottom:22px}
+  .art-body p{font-size:15px;color:var(--text);opacity:.92;line-height:1.7;margin-bottom:14px}
+
+  .up-row{display:flex;gap:13px;align-items:center;margin-bottom:14px}
+  .up-prev{width:84px;height:50px;border-radius:11px;background:var(--surface);border:1px solid var(--border);background-size:cover;background-position:center;flex:none;display:grid;place-items:center;color:var(--muted);font-size:20px}
+  .up-prev.avatar-prev{width:54px;height:54px;border-radius:13px}
+  .up-ttl{font-size:13px;font-weight:600;margin-bottom:5px}
+  .up-btn{position:relative;overflow:hidden;display:inline-block;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);border:1px solid var(--border-strong);border-radius:9px;padding:8px 15px;font-weight:600;font-size:12.5px;cursor:pointer}
+  .up-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+  .fav-pick{display:flex;flex-wrap:wrap;gap:8px;max-height:158px;overflow-y:auto;padding:8px;border:1px solid var(--border);border-radius:12px;background:color-mix(in srgb,var(--text) 3%,transparent)}
+  .fav-chip{display:flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:12.5px;cursor:pointer;transition:.12s;white-space:nowrap}
+  .fav-chip.on{background:color-mix(in srgb,var(--accent) 18%,transparent);border-color:var(--border-strong);color:var(--text)}
+  .fav-chip.disabled{opacity:.32;pointer-events:none}
+
+  /* ОНБОРДИНГ */
+  .ob-card{width:min(480px,94vw);background:var(--elevated);border:1px solid var(--border-strong);border-radius:24px;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.45);position:relative}
+  .ob-skip{position:absolute;top:15px;right:18px;color:var(--muted);font-size:12.5px;cursor:pointer;z-index:3}
+  .ob-skip:hover{color:var(--text)}
+  .ob-viewport{overflow:hidden}
+  .ob-track{display:flex;transition:transform .5s cubic-bezier(.5,.05,.2,1)}
+  .ob-step{min-width:100%;padding:36px 34px;min-height:404px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .ob-step .logo{width:56px;height:56px;margin-bottom:16px}
+  .ob-emoji{font-size:46px;margin-bottom:12px}
+  .ob-step h2{font-family:'Space Grotesk',sans-serif;font-size:25px;font-weight:700;margin-bottom:11px}
+  .ob-step p{color:var(--muted);font-size:14px;line-height:1.6;max-width:370px}
+  .ob-features{display:flex;flex-direction:column;gap:11px;width:100%;margin-top:6px;text-align:left}
+  .ob-feat{display:flex;align-items:center;gap:14px;padding:13px 15px;border:1px solid var(--border);border-radius:13px;background:var(--surface)}
+  .ob-feat .fi{width:42px;height:42px;border-radius:11px;flex:none;display:grid;place-items:center;font-size:21px;background:color-mix(in srgb,var(--accent) 16%,transparent)}
+  .ob-feat b{font-size:14px;display:block;margin-bottom:2px}
+  .ob-feat span{font-size:12.5px;color:var(--muted)}
+  .ob-setup{display:flex;flex-direction:column;gap:16px;width:100%;max-width:370px;margin-top:8px}
+  .ob-set-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .ob-set-row>span{font-size:14px;font-weight:600}
+  .ob-input{width:100%;max-width:320px;margin-top:20px;background:color-mix(in srgb,var(--text) 6%,transparent);border:1px solid var(--border-strong);border-radius:12px;padding:13px 15px;color:var(--text);font-size:16px;text-align:center;font-family:inherit;outline:none;transition:border .15s}
+  .ob-input:focus{border-color:var(--accent)}
+  .ob-check{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font-size:40px;color:#fff;background:var(--grad);margin-bottom:14px;animation:popcheck .55s cubic-bezier(.34,1.5,.5,1)}
+  @keyframes popcheck{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+  .ob-step.active .ob-feat{opacity:0;animation:obrise .5s ease forwards}
+  .ob-step.active .ob-feat:nth-child(1){animation-delay:.05s}
+  .ob-step.active .ob-feat:nth-child(2){animation-delay:.13s}
+  .ob-step.active .ob-feat:nth-child(3){animation-delay:.21s}
+  .ob-step.active .ob-feat:nth-child(4){animation-delay:.29s}
+  @keyframes obrise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .ob-foot{display:flex;align-items:center;justify-content:space-between;padding:20px 26px 24px;border-top:1px solid var(--border)}
+  .ob-dots{display:flex;gap:8px}
+  .ob-dot{width:8px;height:8px;border-radius:50%;background:var(--border-strong);transition:.25s;cursor:pointer}
+  .ob-dot.on{background:var(--accent);width:22px;border-radius:5px}
+  .ob-btns{display:flex;gap:6px;align-items:center}
+  .ob-back{background:transparent;border:none;color:var(--muted);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;padding:8px 12px}
+  .ob-back:hover{color:var(--text)}
+  .ob-next{background:var(--grad);color:#fff;border:none;border-radius:11px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:transform .12s}
+  .ob-next:hover{transform:translateY(-1px)}
+  .confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .confetti i{position:absolute;top:-12px;width:8px;height:8px;border-radius:2px;opacity:0}
+  .ob-step.active .confetti i{animation:fall 1.7s ease-in forwards}
+  @keyframes fall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(460px) rotate(420deg)}}
+
+  .backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:15;opacity:0;pointer-events:none;transition:opacity .25s}
+  body.drawer-open .backdrop{opacity:1;pointer-events:auto}
+
+  /* статус (свой) */
+  .status-pill{position:relative;display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;white-space:nowrap;transition:border .15s}
+  .status-pill:hover{border-color:var(--border-strong)}
+  .status-dot{width:9px;height:9px;border-radius:50%;flex:none;background:#2FD06E}
+  .status-label{font-size:12px;color:var(--muted);opacity:0;transition:opacity .2s}
+  .side:hover .status-label{opacity:1}
+  .status-menu{position:absolute;bottom:calc(100% + 8px);left:0;width:230px;background:var(--elevated);border:1px solid var(--border-strong);border-radius:12px;padding:6px;opacity:0;visibility:hidden;transform:translateY(8px);pointer-events:none;transition:.18s;box-shadow:0 16px 40px rgba(0,0,0,.4);z-index:30}
+  .status-menu.open{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+  .status-opt{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer}
+  .status-opt:hover,.status-opt.on{background:var(--surface)}
+  .status-opt .sd{width:9px;height:9px;border-radius:50%;flex:none;margin-top:4px}
+  .status-opt b{font-size:13px;font-weight:600;display:block}
+  .status-opt span{font-size:11.5px;color:var(--muted)}
+
+  /* сообщество */
+  .comm-tabs{margin-bottom:18px}
+  .comm-pane{display:none}.comm-pane.on{display:block}
+  .usr-search{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:10px 13px;max-width:380px;margin-bottom:18px}
+  .usr-search svg{width:16px;height:16px;color:var(--muted);flex:none}
+  .usr-search input{background:none;border:none;outline:none;color:var(--text);font-size:13px;width:100%;font-family:inherit}
+  .comm-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;position:relative}
+  .comm-head h3{font-size:15px;font-weight:600}
+  .req-btn{position:relative;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;padding:9px 15px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit}
+  .req-badge{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;border-radius:9px;background:#E0524A;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px}
+  .req-menu{position:absolute;top:calc(100% + 8px);right:0;width:300px;max-width:90vw;background:var(--elevated);border:1px solid var(--border-strong);border-radius:14px;padding:8px;opacity:0;visibility:hidden;transform:translateY(8px);pointer-events:none;transition:.18s;box-shadow:0 16px 44px rgba(0,0,0,.45);z-index:25;text-align:left}
+  .req-menu.open{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+  .rm-title{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;padding:7px 9px 9px}
+  .req-row{display:flex;align-items:center;gap:10px;padding:9px;border-radius:10px}
+  .req-row:hover{background:var(--surface)}
+  .rm-act{margin-left:auto;display:flex;gap:6px}
+  .req-ic{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;font-size:14px;cursor:pointer;border:1px solid var(--border-strong);background:var(--surface)}
+  .req-ic.ok{color:#2FD06E}.req-ic.no{color:#E0524A}
+  .req-empty{padding:14px 9px;color:var(--muted);font-size:13px;text-align:center}
+
+  .usr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+  .usr{display:flex;align-items:center;gap:13px;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);transition:.18s;animation:rise .4s ease both}
+  .usr:hover{border-color:var(--border-strong)}
+  .uav{width:46px;height:46px;border-radius:11px;flex:none;display:grid;place-items:center;font-size:22px;position:relative;background-size:cover;background-position:center}
+  .uav .ud{position:absolute;right:-2px;bottom:-2px;width:13px;height:13px;border-radius:50%;border:2px solid var(--surface)}
+  .ubody{flex:1;min-width:0}
+  .ubody>b{font-size:14px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .uu{font-size:12px;color:var(--muted)}
+  .ust{font-size:12px;margin-top:2px;display:flex;align-items:center;gap:6px}
+  .ust .sd{width:8px;height:8px;border-radius:50%;flex:none}
+  .uplay{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+  .uplay b{color:var(--text);font-weight:600}
+  .uact{display:flex;flex-direction:column;gap:6px;flex:none;align-items:stretch}
+  .ubtn{font-size:12px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);border:1px solid var(--border-strong);border-radius:9px;padding:7px 12px;cursor:pointer;font-family:inherit;white-space:nowrap;text-align:center;transition:.15s}
+  .ubtn.ghost{color:var(--text);background:var(--surface)}
+  .ubtn.join{color:#fff;background:var(--grad);border-color:transparent}
+  .ubtn.join.closed,.ubtn.disabled{color:var(--muted);background:var(--surface-2);border-color:var(--border);cursor:not-allowed}
+  .ubtn.done{color:#2FD06E;background:rgba(47,208,110,.14);border-color:rgba(47,208,110,.3);cursor:default}
+
+  .fp-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;margin-bottom:22px}
+  .fp-card{flex:none;width:236px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:13px}
+  .fp-top{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .fp-empty{color:var(--muted);font-size:13px;padding:14px 2px}
+
+  /* вход / регистрация */
+  .auth-card{width:380px;max-width:92vw;background:var(--elevated);border:1px solid var(--border-strong);border-radius:20px;padding:30px 26px 26px;position:relative;text-align:center}
+  .auth-logo{width:48px;height:48px;margin:0 auto 14px}
+  .auth-logo svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 10px color-mix(in srgb,var(--accent) 45%,transparent))}
+  .auth-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700}
+  .auth-sub{font-size:13px;color:var(--muted);margin:5px 0 18px}
+  .auth-tabs{display:flex;background:var(--surface);border-radius:11px;padding:4px;margin-bottom:18px}
+  .auth-tab{flex:1;text-align:center;padding:9px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s}
+  .auth-tab.on{background:var(--grad);color:#fff}
+  .auth-card .field{text-align:left;margin-bottom:12px}
+  .auth-err{color:#FF6B7A;font-size:12.5px;min-height:15px;text-align:left;margin-bottom:8px}
+  .auth-submit{width:100%;background:var(--grad);color:#fff;border:none;border-radius:11px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:filter .15s}
+  .auth-submit:hover{filter:brightness(1.07)}
+  .auth-hint{font-size:11.5px;color:var(--muted);margin-top:13px}
+
+  /* гейт раздела (нужен вход) */
+  .gate{flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:62vh;gap:4px}
+  .gate-icon{font-size:46px;margin-bottom:8px;filter:grayscale(.2)}
+  .gate-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700}
+  .gate-sub{font-size:14px;color:var(--muted);max-width:380px;line-height:1.55}
+  .gate-btn{margin-top:18px;background:var(--grad);color:#fff;border:none;border-radius:11px;padding:12px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:filter .15s}
+  .gate-btn:hover{filter:brightness(1.07)}
+  .pf-logout{display:block;width:100%;margin-top:10px;background:var(--surface);border:1px solid var(--border-strong);color:#FF8088;border-radius:11px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+  .pf-logout:hover{background:color-mix(in srgb,#FF5C7A 12%,var(--surface))}
+  .pf-activity{margin-bottom:4px}
+  .pf-act{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 14px;margin-top:2px}
+  .pf-act-row{display:flex;justify-content:space-between;align-items:center;font-size:13.5px;padding:2px 0}
+  .pf-act-row .pf-act-k{color:var(--muted)}
+  .pf-act-row b{font-weight:600}
+  .pf-act-sub{font-size:12px;color:var(--muted);margin-top:6px}
+  .edit-page{max-width:560px}
+  .edit-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:18px}
+
+  @media (max-width:760px){
+    body{overflow:auto}
+    .window{height:auto;min-height:100vh}
+    .hamburger{display:grid}
+    .shell{grid-template-columns:1fr}
+    .main{grid-column:1;overflow:visible}
+    .side{position:fixed;top:44px;bottom:0;left:0;width:252px;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+    .side:hover{width:252px;box-shadow:none}
+    .side-label,.nav .lbl,.who-wrap,.status-label{opacity:1!important}
+    body.drawer-open .side{transform:translateX(0);box-shadow:30px 0 60px rgba(0,0,0,.4)}
+    .backdrop{display:block}
+    .topbar{padding:16px}.search{display:none!important}
+    .content{padding:6px 16px 40px}
+    .profile-full{margin:-6px -16px 0}
+    .hero{padding:24px}.hero h1{font-size:24px}
+    .ob-step{min-height:380px;padding:30px 24px}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="ambient"><div class="glow"></div></div>
+
+<!-- ОНБОРДИНГ -->
+<div id="onboarding" class="modal show">
+  <div class="ob-card">
+    <span class="ob-skip" id="ob-skip" data-en="Skip">Пропустить</span>
+    <div class="ob-viewport"><div class="ob-track" id="ob-track">
+      <div class="ob-step active">
+        <div class="logo"><svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="lgB" gradientUnits="userSpaceOnUse" x1="18" y1="8" x2="82" y2="90"><stop offset="0" class="lgs1"/><stop offset="1" class="lgs2"/></linearGradient></defs><rect x="24" y="12" width="24" height="76" rx="12" transform="rotate(18 36 50)" fill="url(#lgB)"/><rect x="50" y="47" width="24" height="40" rx="12" transform="rotate(18 62 67)" fill="url(#lgB)"/></svg></div>
+        <h2 data-en="Welcome to UnlimitedMC">Добро пожаловать в UnlimitedMC</h2>
+        <p data-en="A modern Minecraft launcher with mods, modpacks and full customization.">Современный лаунчер Minecraft с модами, сборками и гибкой настройкой.</p>
+      </div>
+      <div class="ob-step">
+        <h2 data-en="Features">Возможности</h2>
+        <div class="ob-features">
+          <div class="ob-feat"><div class="fi">⚡</div><div><b data-en="Any version">Любые версии</b><span data-en="Releases, snapshots and legacy builds">Релизы, снапшоты и старые версии</span></div></div>
+          <div class="ob-feat"><div class="fi">🧩</div><div><b data-en="Mods and modpacks">Моды и сборки</b><span data-en="One-click install from Modrinth and CurseForge">Установка с Modrinth и CurseForge в один клик</span></div></div>
+          <div class="ob-feat"><div class="fi">🔧</div><div><b data-en="All mod loaders">Все загрузчики</b><span>Fabric, Forge, NeoForge, Quilt</span></div></div>
+          <div class="ob-feat"><div class="fi">🎨</div><div><b data-en="Full customization">Гибкая настройка</b><span data-en="Themes, colors and a tailored look">Темы, цвета и оформление под себя</span></div></div>
+        </div>
+      </div>
+      <div class="ob-step">
+        <h2 data-en="Make it yours">Настройте под себя</h2>
+        <p data-en="You can change all of this later in settings.">Все параметры можно изменить позже в настройках.</p>
+        <div class="ob-setup">
+          <div class="ob-set-row"><span data-en="Language">Язык</span><div class="seg"><div class="lang-opt on" data-lang="ru">RU</div><div class="lang-opt" data-lang="en">EN</div></div></div>
+          <div class="ob-set-row"><span data-en="Theme">Тема</span><div class="seg"><div class="theme-opt on" data-theme="dark" data-en="Dark">Тёмная</div><div class="theme-opt" data-theme="light" data-en="Light">Светлая</div></div></div>
+          <div class="ob-set-row"><span data-en="Color">Цвет</span><div class="swatches">
+            <div class="sw sw-p sel" data-c="#4C8DFF" style="background:#4C8DFF"></div>
+            <div class="sw sw-p" data-c="#7C5CFF" style="background:#7C5CFF"></div>
+            <div class="sw sw-p" data-c="#2FD06E" style="background:#2FD06E"></div>
+            <div class="sw sw-p" data-c="#FB8C3C" style="background:#FB8C3C"></div>
+            <div class="sw sw-p" data-c="#FF5C7A" style="background:#FF5C7A"></div>
+          </div></div>
+        </div>
+      </div>
+      <div class="ob-step">
+        <div class="ob-emoji">🎮</div>
+        <h2 data-en="What should we call you?">Как к вам обращаться?</h2>
+        <input class="ob-input" id="ob-nick" placeholder="например, Steve" data-ph-en="e.g. Steve">
+      </div>
+      <div class="ob-step">
+        <div class="confetti">
+          <i style="left:8%;background:#4C8DFF;animation-delay:0s"></i><i style="left:18%;background:#2FD06E;animation-delay:.15s"></i>
+          <i style="left:30%;background:#FB8C3C;animation-delay:.05s"></i><i style="left:42%;background:#FF5C7A;animation-delay:.22s"></i>
+          <i style="left:54%;background:#7C5CFF;animation-delay:.1s"></i><i style="left:66%;background:#4C8DFF;animation-delay:.28s"></i>
+          <i style="left:78%;background:#2FD06E;animation-delay:.08s"></i><i style="left:88%;background:#FB8C3C;animation-delay:.2s"></i>
+          <i style="left:48%;background:#7C5CFF;animation-delay:.33s"></i><i style="left:24%;background:#FF5C7A;animation-delay:.4s"></i>
+        </div>
+        <div class="ob-check">✓</div>
+        <h2 id="ob-done-title">Всё готово!</h2>
+        <p data-en="Enjoy the game!">Приятной игры!</p>
+      </div>
+    </div></div>
+    <div class="ob-foot">
+      <div class="ob-dots" id="ob-dots"></div>
+      <div class="ob-btns"><button class="ob-back" id="ob-back" data-en="Back">Назад</button><button class="ob-next" id="ob-next">Далее</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ОКНО МОДА -->
+<div id="mod-modal" class="modal">
+  <div class="m-card">
+    <span class="m-close" id="mod-close">✕</span>
+    <div class="m-head"><div class="m-icon" id="mod-icon">⚡</div><div><h3 id="mod-name"></h3><div class="m-author" id="mod-author"></div></div></div>
+    <div class="m-shots"><div class="shot">🖼️</div><div class="shot">🏞️</div><div class="shot">🌄</div></div>
+    <p class="m-desc" id="mod-desc"></p>
+    <div class="m-meta"><span data-en="Versions">Версии</span>: 1.21.4, 1.21, 1.20.6 &nbsp;·&nbsp; <span data-en="Loaders">Загрузчики</span>: Fabric, Quilt &nbsp;·&nbsp; <span data-en="License">Лицензия</span>: open-source</div>
+    <button class="m-install" id="mod-install" data-mod="">Установить</button>
+  </div>
+</div>
+
+<!-- УСТАНОВКА В СБОРКУ -->
+<div id="install-modal" class="modal">
+  <div class="pick-card">
+    <span class="m-close" id="pick-close">✕</span>
+    <h3 data-en="Install into instance">Установить в сборку</h3>
+    <p class="pick-sub"><span data-en="Mod">Мод</span>: <b id="pick-mod-name"></b></p>
+    <div class="pick-list" id="pick-list"></div>
+    <button class="mini-btn" id="pick-create" data-en="+ New instance">+ Создать сборку</button>
+  </div>
+</div>
+
+<!-- СОЗДАНИЕ СБОРКИ -->
+<div id="create-modal" class="modal">
+  <div class="m-card" style="width:min(420px,94vw)">
+    <span class="m-close" id="create-close">✕</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:20px;margin-bottom:18px" data-en="New instance">Новая сборка</h3>
+    <div class="field"><label data-en="Name">Название</label><input id="ci-name" placeholder="например, Моя сборка" data-ph-en="e.g. My pack"></div>
+    <div class="field"><label data-en="Version">Версия</label><select id="ci-version" class="ci-select"><option>1.21.4</option><option>1.21.1</option><option>1.20.1</option><option>1.19.2</option><option>1.18.2</option><option>1.16.5</option><option>1.12.2</option></select></div>
+    <div class="field"><label data-en="Loader">Загрузчик</label><select id="ci-loader" class="ci-select"><option>Vanilla</option><option>Fabric</option><option>Forge</option><option>NeoForge</option><option>Quilt</option></select></div>
+    <button class="m-install" id="ci-create" style="margin-top:8px" data-en="Create">Создать</button>
+  </div>
+</div>
+
+<!-- ПРОФИЛЬ (просмотр) -->
+<!-- профиль и новости теперь страницы (в контенте ниже) -->
+
+<!-- ПРОФИЛЬ (редактирование) -->
+<div id="auth-modal" class="modal">
+  <div class="auth-card">
+    <span class="m-close" id="auth-close">✕</span>
+    <div class="auth-logo"><svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="lgAuth" gradientUnits="userSpaceOnUse" x1="18" y1="8" x2="82" y2="90"><stop offset="0" class="lgs1"/><stop offset="1" class="lgs2"/></linearGradient></defs><rect x="24" y="12" width="24" height="76" rx="12" transform="rotate(18 36 50)" fill="url(#lgAuth)"/><rect x="50" y="47" width="24" height="40" rx="12" transform="rotate(18 62 67)" fill="url(#lgAuth)"/></svg></div>
+    <div class="auth-title" id="auth-title">Вход</div>
+    <div class="auth-sub" id="auth-sub" data-en="Sign in to open your profile and community">Войдите, чтобы открыть профиль и сообщество</div>
+    <div class="auth-tabs">
+      <div class="auth-tab on" data-atab="login" data-en="Sign in">Вход</div>
+      <div class="auth-tab" data-atab="register" data-en="Register">Регистрация</div>
+    </div>
+    <div class="field"><label data-en="Username">Юзернейм</label><input id="auth-user" placeholder="например, steve" data-ph-en="e.g. steve" autocomplete="off"></div>
+    <div class="field"><label data-en="Password">Пароль</label><input id="auth-pass" type="password" placeholder="••••••" autocomplete="off"></div>
+    <div class="auth-err" id="auth-err"></div>
+    <button class="auth-submit" id="auth-submit">Войти</button>
+    <div class="auth-hint" data-en="No email, no Microsoft or Ely.by — just a username and password.">Без почты, без Microsoft и Ely.by — только юзернейм и пароль.</div>
+  </div>
+</div>
+
+<!-- редактирование профиля теперь страница (profile-edit) -->
+
+<div class="window">
+  <div class="titlebar">
+    <div class="hamburger" id="burger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>
+    <div class="brand"><div class="logo"><svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="lgA" gradientUnits="userSpaceOnUse" x1="18" y1="8" x2="82" y2="90"><stop offset="0" class="lgs1"/><stop offset="1" class="lgs2"/></linearGradient></defs><rect x="24" y="12" width="24" height="76" rx="12" transform="rotate(18 36 50)" fill="url(#lgA)"/><rect x="50" y="47" width="24" height="40" rx="12" transform="rotate(18 62 67)" fill="url(#lgA)"/></svg></div><div class="wordmark">Unlimited<b>MC</b></div></div>
+    <div class="wctrl"><span></span><span></span><span></span></div>
+  </div>
+
+  <div class="shell">
+    <div class="backdrop" id="backdrop"></div>
+    <aside class="side">
+      <div class="side-label" data-en="Library">Библиотека</div>
+      <div class="nav active" data-go="home" data-title="Главная" data-title-en="Home" data-sub="Готов к запуску" data-sub-en="Ready to play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg><span class="lbl" data-en="Home">Главная</span></div>
+      <div class="nav" data-go="play" data-title="Играть" data-title-en="Play" data-sub="Ваши сборки" data-sub-en="Your instances"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span class="lbl" data-en="Play">Играть</span></div>
+      <div class="nav" data-go="community" data-title="Сообщество" data-title-en="Community" data-sub="Друзья и поиск игроков" data-sub-en="Friends and player search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="lbl" data-en="Community">Сообщество</span></div>
+      <div class="side-label" data-en="Browse">Обзор контента</div>
+      <div class="nav" data-go="modrinth" data-title="Modrinth" data-title-en="Modrinth" data-sub="Моды, паки, шейдеры и сборки" data-sub-en="Mods, packs, shaders and modpacks" data-search="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="lbl">Modrinth</span></div>
+      <div class="nav" data-go="curseforge" data-title="CurseForge" data-title-en="CurseForge" data-sub="Моды, паки, шейдеры и сборки" data-sub-en="Mods, packs, shaders and modpacks" data-search="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7l8-3 8 3-8 3-8-3zM4 7v6l8 3 8-3V7"/></svg><span class="lbl">CurseForge</span></div>
+      <div class="nav" data-go="settings" data-title="Настройки" data-title-en="Settings" data-sub="Профиль, оформление и поведение" data-sub-en="Profile, appearance and behavior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.3 1a7 7 0 0 0-1.7-1l-.3-2.5h-4l-.3 2.5a7 7 0 0 0-1.7 1l-2.3-1-2 3.5 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.3-1a7 7 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7 7 0 0 0 1.7-1l2.3 1 2-3.5-2-1.5a7 7 0 0 0 .1-1z"/></svg><span class="lbl" data-en="Settings">Настройки</span></div>
+      <div class="side-bottom">
+        <div class="status-pill" id="status-pill">
+          <span class="status-dot" id="status-dot"></span>
+          <span class="status-label" id="status-label">В сети</span>
+          <div class="status-menu" id="status-menu">
+            <div class="status-opt on" data-st="online"><span class="sd" style="background:#2FD06E"></span><div><b data-en="Online">В сети</b><span data-en="Shows where you play">Видно, где вы играете</span></div></div>
+            <div class="status-opt" data-st="dnd"><span class="sd" style="background:#E0524A"></span><div><b data-en="Do not disturb">Не беспокоить</b><span data-en="Shows only your play time">Видно только время в игре</span></div></div>
+            <div class="status-opt" data-st="invisible"><span class="sd" style="background:#8A92A6"></span><div><b data-en="Invisible">Невидимый</b><span data-en="No one sees your activity">Никто не видит вашу активность</span></div></div>
+          </div>
+        </div>
+        <div class="account" id="account">
+          <div class="avatar" id="acc-avatar">Г</div>
+          <div class="who-wrap"><div class="who" id="acc-name">Гость</div><div class="tag" id="acc-tag">Локальный профиль</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div><div class="page-title" id="ptitle">Главная</div><div class="page-sub" id="psub">Готов к запуску</div></div>
+        <div class="search" id="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span data-en="Search mods, packs, shaders…">Поиск модов, паков, шейдеров…</span></div>
+      </div>
+
+      <div class="content">
+        <!-- HOME -->
+        <section class="view active" data-view="home">
+          <div class="hero">
+            <h1 id="greeting">Привет!</h1>
+            <div class="hero-row">
+              <div class="select" id="home-select">Сборок пока нет</div>
+              <button class="btn-play" id="home-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span data-en="Play">Играть</span></button>
+            </div>
+          </div>
+          <div class="section-h"><h3 data-en="Minecraft News">Новости Minecraft</h3><a data-en="All →">Всё →</a></div>
+          <div class="news-grid" id="news-mc"></div>
+          <div class="section-h"><h3 data-en="UnlimitedMC News">Новости UnlimitedMC</h3><a data-en="All →">Все →</a></div>
+          <div class="news-grid" id="news-umc"></div>
+          <div class="ad" id="ad"><span class="x" id="ad-x">✕</span><b data-en="🏷️ UnlimitedMC — mockup v6">🏷️ UnlimitedMC — макет v6</b><p data-en="Mockup version — so you can tell builds apart. Changes with every update.">Версия макета — чтобы отличать сборки. Меняется с каждой правкой.</p></div>
+        </section>
+
+        <!-- PLAY -->
+        <section class="view" data-view="play">
+          <div class="acc-select">
+            <div class="acc-label" data-en="Account to play with">Аккаунт для игры</div>
+            <div class="seg" id="acc-seg">
+              <div class="seg-opt on" data-acc="offline" data-en="Offline">Автономный</div>
+              <div class="seg-opt" data-acc="ely">Ely.by</div>
+              <div class="seg-opt" data-acc="ms">Microsoft</div>
+            </div>
+            <div class="acc-pane on" data-acc-pane="offline"><div class="field" style="margin-bottom:0;max-width:280px"><label data-en="Nickname (no password)">Ник (без пароля)</label><input placeholder="например, Steve" data-ph-en="e.g. Steve"></div></div>
+            <div class="acc-pane" data-acc-pane="ely"><p data-en="You’ll sign in with Ely.by when launching the game.">При запуске игры войдёшь через Ely.by.</p><button class="mini-btn" data-en="Sign in (test)">Войти (тест)</button></div>
+            <div class="acc-pane" data-acc-pane="ms"><p data-en="You’ll sign in with Microsoft when launching the game.">При запуске игры войдёшь через Microsoft.</p><button class="mini-btn" data-en="Sign in (test)">Войти (тест)</button></div>
+          </div>
+          <div class="section-h"><h3 data-en="Friends playing now">Друзья сейчас играют</h3></div>
+          <div class="fp-scroll" id="fp-scroll"></div>
+          <div class="section-h"><h3 data-en="Your instances">Ваши сборки</h3><a id="create-link" data-en="+ New instance">+ Создать сборку</a></div>
+          <div class="row" id="instances-grid"></div>
+        </section>
+
+        <!-- COMMUNITY -->
+        <section class="view" data-view="community">
+          <div id="comm-gate" class="gate" style="display:none">
+            <div class="gate-icon">🔒</div>
+            <div class="gate-title" data-en="Sign in to UnlimitedMC">Войдите в аккаунт UnlimitedMC</div>
+            <div class="gate-sub" data-en="To view the community, sign in to your UnlimitedMC account.">Для того чтобы просматривать сообщество войдите в аккаунт UnlimitedMC.</div>
+            <button class="gate-btn" id="comm-login" data-en="Sign in / Register">Войти / Зарегистрироваться</button>
+          </div>
+          <div id="comm-main">
+          <div class="seg comm-tabs">
+            <div class="seg-opt on" data-ctab="search" data-en="Search">Поиск</div>
+            <div class="seg-opt" data-ctab="friends" data-en="Friends">Друзья</div>
+          </div>
+          <div class="comm-pane on" data-cpane="search">
+            <div class="usr-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="usr-search" placeholder="Поиск по юзернейму" data-ph-en="Search by username"></div>
+            <div class="usr-grid" id="search-results"></div>
+          </div>
+          <div class="comm-pane" data-cpane="friends">
+            <div class="comm-head">
+              <h3><span data-en="Friends">Друзья</span> · <span id="friends-count">0</span></h3>
+              <button class="req-btn" id="req-btn"><span data-en="Requests">Заявки</span><span class="req-badge" id="req-badge">0</span></button>
+              <div class="req-menu" id="req-menu"><div class="rm-title" data-en="Friend requests">Заявки в друзья</div><div id="req-list"></div></div>
+            </div>
+            <div class="usr-grid" id="friends-list"></div>
+          </div>
+          </div>
+        </section>
+
+        <!-- MODRINTH -->
+        <section class="view" data-view="modrinth">
+          <div class="chips" data-source="modrinth">
+            <div class="chip on" data-cat="mod" data-en="Mods">Моды</div>
+            <div class="chip" data-cat="modpack" data-en="Modpacks">Сборки</div>
+            <div class="chip" data-cat="resourcepack" data-en="Resource Packs">Ресурспаки</div>
+            <div class="chip" data-cat="shader" data-en="Shaders">Шейдеры</div>
+            <div class="chip" data-cat="datapack">Datapacks</div>
+          </div>
+          <div class="grid" id="grid-modrinth"></div>
+        </section>
+
+        <!-- CURSEFORGE -->
+        <section class="view" data-view="curseforge">
+          <div class="chips" data-source="curseforge">
+            <div class="chip on" data-cat="mod" data-en="Mods">Моды</div>
+            <div class="chip" data-cat="modpack" data-en="Modpacks">Сборки</div>
+            <div class="chip" data-cat="resourcepack" data-en="Resource Packs">Ресурспаки</div>
+            <div class="chip" data-cat="shader" data-en="Shaders">Шейдеры</div>
+            <div class="chip" data-cat="map" data-en="Maps">Карты</div>
+          </div>
+          <div class="grid" id="grid-curseforge"></div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section class="view" data-view="settings">
+          <div class="set-h" data-en="Profile & account">Профиль и аккаунт</div>
+          <div class="opt">
+            <div><div class="t" data-en="Profile">Профиль</div><div class="d" data-en="Name, @username, avatar, favorite mods and socials">Имя, @username, аватар, любимые моды и соцсети</div></div>
+            <button class="mini-btn" id="set-edit-profile" data-en="Edit">Редактировать</button>
+          </div>
+          <div class="opt">
+            <div><div class="t" data-en="Local name">Локальное имя</div><div class="d" data-en="Used in greetings">Используется в приветствиях</div></div>
+            <button class="mini-btn" id="set-change-name" data-en="Change">Сменить</button>
+          </div>
+          <div class="opt" style="flex-direction:column;align-items:stretch;gap:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+              <div><div class="t" data-en="Sign in to umclaunch.net">Вход на сайт umclaunch.net</div><div class="d" data-en="One-time link, no password">Одноразовая ссылка, без пароля</div></div>
+              <button class="mini-btn" id="gen-link" data-en="Generate link">Сгенерировать ссылку</button>
+            </div>
+            <div class="otl" id="otl-box" style="display:none"><span data-en="Valid once:">Действует один раз:</span><code id="otl-code"></code></div>
+          </div>
+          <div class="opt">
+            <div><div class="t" data-en="Intro guide">Вступительный гайд</div><div class="d" data-en="Replay the welcome screens">Пройти приветственные экраны заново</div></div>
+            <button class="mini-btn" id="set-replay" data-en="Replay">Пройти заново</button>
+          </div>
+
+          <div class="set-h" data-en="Appearance">Оформление</div>
+          <div class="opt">
+            <div><div class="t" data-en="Language">Язык</div><div class="d" data-en="Interface language">Язык интерфейса</div></div>
+            <div class="seg"><div class="lang-opt on" data-lang="ru">RU</div><div class="lang-opt" data-lang="en">EN</div></div>
+          </div>
+          <div class="opt">
+            <div><div class="t" data-en="Theme">Тема</div><div class="d" data-en="Light or dark interface">Светлый или тёмный интерфейс</div></div>
+            <div class="seg"><div class="theme-opt on" data-theme="dark" data-en="Dark">Тёмная</div><div class="theme-opt" data-theme="light" data-en="Light">Светлая</div></div>
+          </div>
+          <div class="opt">
+            <div><div class="t" data-en="Accent color">Цвет акцента</div><div class="d" data-en="Used across the interface and gradients">Используется в интерфейсе и градиентах</div></div>
+            <div class="swatches">
+              <div class="sw sw-p sel" data-c="#4C8DFF" style="background:#4C8DFF"></div>
+              <div class="sw sw-p" data-c="#7C5CFF" style="background:#7C5CFF"></div>
+              <div class="sw sw-p" data-c="#2FD06E" style="background:#2FD06E"></div>
+              <div class="sw sw-p" data-c="#FB8C3C" style="background:#FB8C3C"></div>
+              <div class="sw sw-p" data-c="#FF5C7A" style="background:#FF5C7A"></div>
+            </div>
+          </div>
+          <div class="opt">
+            <div><div class="t" data-en="Reactive background by source">Реактивный фон под источник</div><div class="d" data-en="Green on Modrinth, orange on CurseForge">Зелёный на Modrinth, оранжевый на CurseForge</div></div>
+            <div class="toggle on" id="reactive-toggle"></div>
+          </div>
+          <div class="opt">
+            <div><div class="t" data-en="RAM allocation">Выделение ОЗУ</div><div class="d" data-en="Memory given to the game">Память, выделяемая игре</div></div>
+            <div class="select" id="ram">6 ГБ</div>
+          </div>
+        </section>
+
+        <!-- PROFILE (страница) -->
+        <section class="view" data-view="profile">
+          <div class="profile-full">
+            <div class="pf-header" id="pf-header"></div>
+            <div class="pf-avatar" id="pf-avatar"></div>
+            <div class="pf-body">
+              <div class="pf-name" id="pf-name"></div>
+              <div class="pf-user" id="pf-user"></div>
+              <div class="pf-bio" id="pf-bio"></div>
+              <div class="pf-activity" id="pf-activity" style="display:none"></div>
+              <div class="pf-sec" data-en="Favorite mods">Любимые моды</div>
+              <div class="pf-mods" id="pf-mods"></div>
+              <div class="pf-sec" data-en="Socials">Соцсети</div>
+              <div class="pf-socials" id="pf-socials"></div>
+              <button class="m-install pf-edit" id="pf-edit" data-en="Edit profile">Редактировать профиль</button>
+              <button class="pf-logout" id="pf-logout" data-en="Log out">Выйти из аккаунта</button>
+              <button class="back-btn pf-back-full" id="pf-back">←&nbsp;<span data-en="Back">Назад</span></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- PROFILE EDIT (страница) -->
+        <section class="view" data-view="profile-edit">
+          <button class="back-btn" id="pe-back">←&nbsp;<span data-en="Back">Назад</span></button>
+          <div class="edit-page">
+            <h3 class="edit-title" data-en="Edit profile">Редактирование профиля</h3>
+            <div class="up-row">
+              <div class="up-prev" id="pe-header-prev">🖼️</div>
+              <div><div class="up-ttl" data-en="Header">Шапка</div><label class="up-btn"><span data-en="Upload">Загрузить</span><input type="file" accept="image/*" id="pe-header-file"></label></div>
+            </div>
+            <div class="up-row">
+              <div class="up-prev avatar-prev" id="pe-avatar-prev">🙂</div>
+              <div><div class="up-ttl" data-en="Avatar">Аватар</div><label class="up-btn"><span data-en="Upload">Загрузить</span><input type="file" accept="image/*" id="pe-avatar-file"></label></div>
+            </div>
+            <div class="field"><label data-en="Name">Имя</label><input id="pe-name" placeholder="Ваше имя" data-ph-en="Your name"></div>
+            <div class="field"><label>@username</label><input id="pe-user" placeholder="username" data-ph-en="username"></div>
+            <div class="field"><label data-en="Description">Описание</label><textarea id="pe-bio" placeholder="Пара слов о себе" data-ph-en="A few words about you"></textarea></div>
+            <div class="field"><label><span data-en="Favorite mods">Любимые моды</span> <span style="color:var(--muted)">(<span id="pe-fav-count">0</span>/3)</span></label><div class="fav-pick" id="pe-fav"></div></div>
+            <div class="field"><label data-en="Telegram">Telegram</label><input id="pe-tg" placeholder="@you / ссылка" data-ph-en="@you / link"></div>
+            <div class="field"><label data-en="YouTube">YouTube</label><input id="pe-yt" placeholder="ссылка на канал" data-ph-en="channel link"></div>
+            <div class="field"><label data-en="Discord">Discord</label><input id="pe-dc" placeholder="ник / инвайт" data-ph-en="tag / invite"></div>
+            <button class="m-install" id="pe-save" style="margin-top:8px" data-en="Save">Сохранить</button>
+          </div>
+        </section>
+
+        <!-- ARTICLE (страница) -->
+        <section class="view" data-view="article">
+          <button class="back-btn" id="art-back">←&nbsp;<span data-en="Back">Назад</span></button>
+          <div class="article">
+            <div class="art-cover" id="art-cover"></div>
+            <div class="art-tag" id="art-tag"></div>
+            <h1 class="art-title" id="art-title"></h1>
+            <div class="art-date" id="art-date"></div>
+            <div class="art-body" id="art-body"></div>
+          </div>
+        </section>
+
+        <div style="margin-top:26px;font-size:12px;color:var(--muted);text-align:center;opacity:.8" data-en="Clickable look-and-feel mockup — not the launcher itself.">Кликабельный макет внешнего вида — не сам лаунчер.</div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  const root=document.documentElement, body=document.body;
+  const dlSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>';
+
+  /* ---------- контент по категориям ---------- */
+  const CONTENT={
+    modrinth:[
+      {id:'sodium',icon:'⚡',name:'Sodium',author:'CaffeineMC',cat:'mod',dl:'18.2M',desc:'Современный движок рендеринга — серьёзный прирост FPS.',descEn:'A modern rendering engine — a serious FPS boost.'},
+      {id:'fabricapi',icon:'🔧',name:'Fabric API',author:'FabricMC',cat:'mod',dl:'22.1M',desc:'Базовая библиотека почти для любого Fabric-мода.',descEn:'The core library for almost any Fabric mod.'},
+      {id:'lithium',icon:'🧪',name:'Lithium',author:'CaffeineMC',cat:'mod',dl:'12.0M',desc:'Оптимизация игровой логики без изменения механик.',descEn:'Game logic optimization without changing mechanics.'},
+      {id:'fo',icon:'🧊',name:'Fabulously Optimized',author:'сборка',cat:'modpack',dl:'5.1M',desc:'Готовая сборка для максимума производительности.',descEn:'A ready pack for maximum performance.'},
+      {id:'adrenaline',icon:'🚀',name:'Adrenaline',author:'сборка',cat:'modpack',dl:'0.4M',desc:'Сборка с упором на FPS и красивый свет.',descEn:'A pack focused on FPS and nice lighting.'},
+      {id:'faithful',icon:'🎨',name:'Faithful 32x',author:'Faithful',cat:'resourcepack',dl:'3.0M',desc:'Ванильный стиль в повышенном разрешении.',descEn:'Vanilla style in higher resolution.'},
+      {id:'staytrue',icon:'🖌️',name:'Stay True',author:'Lunaut',cat:'resourcepack',dl:'1.4M',desc:'Мягкий, чистый ванильный ресурспак.',descEn:'A soft, clean vanilla resource pack.'},
+      {id:'complementary',icon:'🌅',name:'Complementary Shaders',author:'EminGT',cat:'shader',dl:'4.2M',desc:'Один из самых популярных шейдеров.',descEn:'One of the most popular shader packs.'},
+      {id:'bsl',icon:'🌄',name:'BSL Shaders',author:'capttatsu',cat:'shader',dl:'2.1M',desc:'Яркие цвета и приятная картинка.',descEn:'Vivid colors and a pleasant look.'},
+      {id:'terralith',icon:'🏔️',name:'Terralith',author:'Stardust Labs',cat:'datapack',dl:'1.8M',desc:'Сотни новых биомов без модов.',descEn:'Hundreds of new biomes, no mods needed.'},
+      {id:'incendium',icon:'🔥',name:'Incendium',author:'Stardust Labs',cat:'datapack',dl:'0.9M',desc:'Полная переработка Нижнего мира.',descEn:'A full rework of the Nether.'}
+    ],
+    curseforge:[
+      {id:'jei',icon:'📖',name:'JEI — Just Enough Items',author:'mezz',cat:'mod',dl:'340M',desc:'Просмотр всех предметов и рецептов в инвентаре.',descEn:'See all items and recipes in your inventory.'},
+      {id:'ae2',icon:'🔌',name:'Applied Energistics 2',author:'AE2 Team',cat:'mod',dl:'72M',desc:'Цифровое хранение и автоматизация ресурсов.',descEn:'Digital storage and resource automation.'},
+      {id:'jade',icon:'🔎',name:'Jade',author:'Snownee',cat:'mod',dl:'55M',desc:'Показывает, на что смотришь: блок, моб, прогресс.',descEn:'Shows what you look at: block, mob, progress.'},
+      {id:'atm9',icon:'🧰',name:'All the Mods 9',author:'сборка',cat:'modpack',dl:'14.8M',desc:'Сотни модов: техника, магия, исследование.',descEn:'Hundreds of mods: tech, magic, exploration.'},
+      {id:'bettermc',icon:'🔮',name:'Better MC',author:'сборка',cat:'modpack',dl:'9.0M',desc:'Большая сборка для красивой выживалки.',descEn:'A large pack for beautiful survival.'},
+      {id:'sphax',icon:'🟦',name:'Sphax PureBDcraft',author:'Sphax',cat:'resourcepack',dl:'20M',desc:'Мультяшный стиль в высоком разрешении.',descEn:'Cartoon style in high resolution.'},
+      {id:'faithful64',icon:'🎨',name:'Faithful 64x',author:'Faithful',cat:'resourcepack',dl:'15M',desc:'Чёткий ванильный стиль 64x.',descEn:'Crisp vanilla style at 64x.'},
+      {id:'continuum',icon:'🌌',name:'Continuum Shaders',author:'Continuum',cat:'shader',dl:'5.5M',desc:'Фотореалистичная графика для мощных ПК.',descEn:'Photorealistic graphics for strong PCs.'},
+      {id:'complereimg',icon:'🌇',name:'Complementary Reimagined',author:'EminGT',cat:'shader',dl:'3.3M',desc:'Переосмысленная версия Complementary.',descEn:'A reimagined version of Complementary.'},
+      {id:'diversity',icon:'🗺️',name:'Diversity 3',author:'Qmagnet',cat:'map',dl:'2.0M',desc:'Карта-приключение с разными жанрами.',descEn:'An adventure map blending many genres.'},
+      {id:'skyblock',icon:'🏝️',name:'SkyBlock',author:'Noobcrew',cat:'map',dl:'6.4M',desc:'Классический вызов на парящем острове.',descEn:'The classic floating-island challenge.'}
+    ]
+  };
+  const ALL=[...CONTENT.modrinth,...CONTENT.curseforge];
+  function findItem(id){ return ALL.find(x=>x.id===id); }
+  let backTo='home', lastArticle=null;
+  const NEWS=[
+    {id:'garden',group:'mc',cover:'🌳',tag:'Обновление',tagEn:'Update',date:'12 июня',dateEn:'June 12',title:'The Garden Awakens',titleEn:'The Garden Awakens',
+     sum:'Новая листва, мобы и блоки уже появились в свежем снапшоте.',sumEn:'New foliage, mobs and blocks arrived in the latest snapshot.',
+     body:['В свежем снапшоте появилась пышная растительность, новые мобы и декоративные блоки — мир стал заметно живее.','Часть нововведений войдёт в ближайшее крупное обновление, а пока их можно потестировать в экспериментальном режиме.'],
+     bodyEn:['The latest snapshot adds lush vegetation, new mobs and decorative blocks — the world feels much more alive.','Some of these features will land in the next major update; for now you can try them in experimental mode.']},
+    {id:'inv',group:'mc',cover:'📦',tag:'Снапшот',tagEn:'Snapshot',date:'5 июня',dateEn:'June 5',title:'Эксперименты с инвентарём',titleEn:'Inventory experiments',
+     sum:'Разработчики тестируют новые рецепты и сортировку предметов.',sumEn:'Devs are testing new recipes and item sorting.',
+     body:['Команда экспериментирует с автоматической сортировкой предметов и обновлёнными рецептами крафта.','Цель — сделать управление инвентарём удобнее, особенно в больших сборках с сотнями предметов.'],
+     bodyEn:['The team is experimenting with automatic item sorting and updated crafting recipes.','The goal is easier inventory management, especially in large modpacks with hundreds of items.']},
+    {id:'live',group:'mc',cover:'🎉',tag:'Событие',tagEn:'Event',date:'1 июня',dateEn:'June 1',title:'Minecraft Live',titleEn:'Minecraft Live',
+     sum:'Голосование за нового моба и анонсы будущих обновлений.',sumEn:'Vote for the new mob and see upcoming announcements.',
+     body:['Скоро состоится Minecraft Live — традиционное событие с анонсами и голосованием за нового моба.','Сообщество снова выберет, какое существо добавят в игру следующим. Готовь свой голос!'],
+     bodyEn:['Minecraft Live is coming soon — the traditional event with announcements and a vote for a new mob.','The community will choose which creature gets added next. Get your vote ready!']},
+    {id:'content',group:'umc',cover:'✨',tag:'v0.3',tagEn:'v0.3',date:'10 июня',dateEn:'June 10',title:'Modrinth и CurseForge',titleEn:'Modrinth and CurseForge',
+     sum:'Моды, шейдеры и сборки теперь ставятся прямо из лаунчера.',sumEn:'Mods, shaders and packs now install right from the launcher.',
+     body:['Теперь моды, шейдеры, ресурспаки и сборки можно искать и устанавливать прямо в UnlimitedMC — в один клик, в нужную сборку.','Поддерживаются оба крупнейших каталога: Modrinth и CurseForge. Больше не нужно качать файлы вручную и раскидывать их по папкам.'],
+     bodyEn:['You can now search and install mods, shaders, resource packs and modpacks right inside UnlimitedMC — one click into the instance you choose.','Both major catalogs are supported: Modrinth and CurseForge. No more downloading files by hand and sorting them into folders.']},
+    {id:'profiles',group:'umc',cover:'🎨',tag:'Кастомизация',tagEn:'Customization',date:'7 июня',dateEn:'June 7',title:'Профили и друзья',titleEn:'Profiles and friends',
+     sum:'Профиль, друзья и статусы: смотри, кто из друзей в игре.',sumEn:'Profiles, friends and statuses: see who is in-game.',
+     body:['Появились профили игроков: имя, @username, аватар и шапка, описание, любимые моды и ссылки на соцсети.','А ещё друзья и статусы — видно, кто из друзей сейчас в игре, и можно заходить к ним в открытый мир.'],
+     bodyEn:['Player profiles are here: name, @username, avatar and header, bio, favorite mods and social links.','Plus friends and statuses — see which friends are in-game right now and join their open world.']},
+    {id:'speed',group:'umc',cover:'⚡',tag:'Скорость',tagEn:'Speed',date:'3 июня',dateEn:'June 3',title:'Запуск стал быстрее',titleEn:'Faster launch',
+     sum:'Сборки грузятся заметно шустрее, чем раньше.',sumEn:'Instances load noticeably faster than before.',
+     body:['Мы оптимизировали загрузку сборок — теперь игра запускается заметно быстрее, особенно на больших модпаках.','Дальше в планах — ускорить и саму установку модов.'],
+     bodyEn:['We optimized instance loading — the game now starts noticeably faster, especially on large modpacks.','Next up: speeding up mod installation itself.']}
+  ];
+
+  /* ---------- состояние ---------- */
+  let instances=[]; let idc=1;
+  let localName='Гость';
+  let profile={name:'',username:'',bio:'',avatar:null,header:null,favMods:[],tg:'',yt:'',dc:''};
+  let currentView='home';
+
+  /* ---------- сообщество: данные ---------- */
+  const STATUS={online:{dot:'#2FD06E',ru:'В сети',en:'Online'},dnd:{dot:'#E0524A',ru:'Не беспокоить',en:'Do not disturb'},invisible:{dot:'#8A92A6',ru:'Невидимый',en:'Invisible'},offline:{dot:'#5B6170',ru:'Не в сети',en:'Offline'}};
+  let myStatus='online';
+  function vis(st){ return st==='invisible'?'offline':st; }
+  function fmtTime(m){ if(m<60) return m+(lang==='en'?'m':'м'); const h=Math.floor(m/60),mm=m%60; return h+(lang==='en'?'h':'ч')+(mm?' '+mm+(lang==='en'?'m':'м'):''); }
+  const PLAYERS=[
+    {username:'shadow_fox',name:'Артём',emoji:'🦊',color:'#FB8C3C',bio:'Строю и автоматизирую.',fav:['create','jei'],status:'online',tg:'@artem'},
+    {username:'mc_lina',name:'Лина',emoji:'🌸',color:'#FF5C7A',bio:'Люблю красивые сборки и шейдеры.',fav:['complementary','sodium'],status:'online'},
+    {username:'diman_pro',name:'Дима',emoji:'🎮',color:'#4C8DFF',bio:'PvP и хардкор.',fav:['sodium'],status:'dnd'},
+    {username:'kira_b',name:'Кира',emoji:'🐱',color:'#2FD06E',bio:'Исследую миры и собираю всё подряд.',fav:['terralith'],status:'online'},
+    {username:'old_gleb',name:'Глеб',emoji:'⚙️',color:'#8A92A6',bio:'1.12.2 навсегда.',fav:['jei','ae2'],status:'offline'},
+    {username:'sonya_g',name:'Соня',emoji:'👻',color:'#7C5CFF',bio:'Тут редко.',fav:[],status:'invisible'},
+    {username:'pixel_max',name:'Макс',emoji:'🧱',color:'#FB8C3C',bio:'Строитель и декоратор.',fav:['create'],status:'online'},
+    {username:'nova_kat',name:'Катя',emoji:'⭐',color:'#7C5CFF',bio:'Магия и приключения.',fav:['terralith','jei'],status:'online',yt:'youtube/kat'},
+    {username:'redstone_ru',name:'Игорь',emoji:'🔴',color:'#E0524A',bio:'Редстоун-инженер.',fav:['jei'],status:'dnd'}
+  ];
+  let friends=[
+    {username:'shadow_fox',name:'Артём',emoji:'🦊',color:'#FB8C3C',bio:'Строю и автоматизирую.',fav:['create','jei'],tg:'@artem',status:'online',playing:{instance:'All the Mods 9',version:'Forge 1.20.1',world:'Survival SMP',mins:83,open:true}},
+    {username:'mc_lina',name:'Лина',emoji:'🌸',color:'#FF5C7A',bio:'Люблю красивые сборки и шейдеры.',fav:['complementary','sodium'],status:'online',playing:{instance:'Fabulously Optimized',version:'Fabric 1.21.4',world:'Творческий',mins:42,open:false}},
+    {username:'diman_pro',name:'Дима',emoji:'🎮',color:'#4C8DFF',bio:'PvP и хардкор.',fav:['sodium'],status:'dnd',playing:{instance:'Better MC',version:'Fabric 1.20.1',world:'Хардкор',mins:125,open:false}},
+    {username:'kira_b',name:'Кира',emoji:'🐱',color:'#2FD06E',bio:'Исследую миры и собираю всё подряд.',fav:['terralith'],status:'online',playing:{instance:'Vanilla',version:'Release 1.21.4',world:'Выживание',mins:18,open:true}},
+    {username:'old_gleb',name:'Глеб',emoji:'⚙️',color:'#8A92A6',bio:'1.12.2 навсегда.',fav:['jei','ae2'],status:'offline',playing:null},
+    {username:'sonya_g',name:'Соня',emoji:'👻',color:'#7C5CFF',bio:'Тут редко.',fav:[],status:'invisible',playing:{instance:'RLCraft',version:'Forge 1.12.2',world:'Соло',mins:60,open:false}}
+  ];
+  let requests=[
+    {username:'steve_2012',name:'Стив',emoji:'🟩',color:'#2FD06E',bio:'Новичок, играю с друзьями.',fav:[]},
+    {username:'miner_pro',name:'Майнер',emoji:'⛏️',color:'#FB8C3C',bio:'Копаю глубоко.',fav:['jei']},
+    {username:'aqua_nik',name:'Ник',emoji:'💧',color:'#4C8DFF',bio:'Строю под водой.',fav:['sodium']}
+  ];
+  const sent=new Set();
+  function loaderIcon(l){ return ({Fabric:'🧵',Forge:'⚙️',NeoForge:'🔥',Quilt:'🧶',Vanilla:'🟩'})[l]||'📦'; }
+  function isInstalled(modId){ return instances.some(i=>i.mods.includes(modId)); }
+
+  /* ---------- язык ---------- */
+  let lang='ru';
+  const T={ru:{install:'Установить',installed:'Установлено ✓',play:'Играть',launching:'Запуск…',ram:'ГБ',next:'Далее',start:'Начать играть',done:'Всё готово, {n}!',defName:'Игрок',mods:'модов',add:'Добавить',added:'Добавлено ✓',noInst:'У вас пока нет сборок',createFirst:'Создать первую сборку',empty:'Здесь пока пусто',localProfile:'Локальный профиль',noName:'Без имени',noUser:'юзернейм не задан',noBio:'Описание пока не заполнено.',notSel:'Не выбраны',noLinks:'Ссылок нет',noInstShort:'Сборок пока нет',addFriend:'Добавить',sent:'Отправлено',inFriends:'В друзьях',profileBtn:'Профиль',join:'Зайти',connecting:'Подключение…',inGame:'В игре',noFriends:'У вас пока нет друзей',noFriendsPlaying:'Сейчас никто из друзей не играет',noRequests:'Нет новых заявок'},
+           en:{install:'Install',installed:'Installed ✓',play:'Play',launching:'Launching…',ram:'GB',next:'Next',start:'Start playing',done:'All set, {n}!',defName:'Player',mods:'mods',add:'Add',added:'Added ✓',noInst:'You have no instances yet',createFirst:'Create your first instance',empty:'Nothing here yet',localProfile:'Local profile',noName:'No name',noUser:'username not set',noBio:'No description yet.',notSel:'Not selected',noLinks:'No links',noInstShort:'No instances yet',addFriend:'Add',sent:'Sent',inFriends:'Friends',profileBtn:'Profile',join:'Join',connecting:'Connecting…',inGame:'In game',noFriends:'You have no friends yet',noFriendsPlaying:'No friends are playing right now',noRequests:'No new requests'}};
+  const GREET={ru:['С возвращением, {n}!','Рад тебя видеть, {n}','Погнали, {n}!','Привет, {n} 👋','{n}, готов к приключениям?','Давно не виделись, {n}!'],
+               en:['Welcome back, {n}!','Good to see you, {n}','Let’s go, {n}!','Hey {n} 👋','Ready for an adventure, {n}?','Long time no see, {n}!']};
+
+  function applyLang(l){
+    lang=l;
+    document.querySelectorAll('[data-en]').forEach(el=>{ if(el.dataset.ru===undefined) el.dataset.ru=el.textContent; el.textContent=l==='en'?el.dataset.en:el.dataset.ru; });
+    document.querySelectorAll('[data-ph-en]').forEach(inp=>{ if(inp.dataset.phRu===undefined) inp.dataset.phRu=inp.placeholder; inp.placeholder=l==='en'?inp.dataset.phEn:inp.dataset.phRu; });
+    document.querySelectorAll('.lang-opt').forEach(o=>o.classList.toggle('on',o.dataset.lang===l));
+    refreshTitle(); refreshGreeting(); obSyncLabels(); refreshAccountChip(); renderProfile();
+    const ramNum=document.getElementById('ram').textContent.replace(/[^0-9]/g,''); document.getElementById('ram').textContent=ramNum+' '+T[l].ram;
+    renderGrid('modrinth'); renderGrid('curseforge'); renderInstances(); updateHomeSelect();
+    refreshStatus(); renderFriends(); renderSearch(); renderRequests(); renderPlayFriends();
+    renderNews(); if(lastArticle) fillArticle(lastArticle);
+    if(document.getElementById('install-modal').classList.contains('show')) renderPicker();
+  }
+  document.querySelectorAll('.lang-opt').forEach(o=>o.addEventListener('click',()=>applyLang(o.dataset.lang)));
+
+  /* ---------- тема ---------- */
+  function applyTheme(m){ root.setAttribute('data-theme',m); document.querySelectorAll('.theme-opt').forEach(o=>o.classList.toggle('on',o.dataset.theme===m)); }
+  document.querySelectorAll('.theme-opt').forEach(o=>o.addEventListener('click',()=>applyTheme(o.dataset.theme)));
+
+  /* ---------- навигация ---------- */
+  function refreshTitle(){ const nav=document.querySelector('.nav[data-go="'+currentView+'"]'); if(!nav)return; document.getElementById('ptitle').textContent=lang==='en'?nav.dataset.titleEn:nav.dataset.title; document.getElementById('psub').textContent=lang==='en'?nav.dataset.subEn:nav.dataset.sub; }
+  function showView(go){
+    currentView=go;
+    document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.go===go));
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.dataset.view===go));
+    applyAccent(); refreshTitle();
+    document.querySelector('.topbar').style.display=(go==='profile')?'none':'';
+    const nav=document.querySelector('.nav[data-go="'+go+'"]');
+    document.getElementById('search').style.display=nav&&nav.dataset.search?'flex':'none';
+    document.querySelector('.main').scrollTo({top:0}); body.classList.remove('drawer-open');
+    if(go==='home') refreshGreeting();
+    if(go==='community'){
+      const gate=document.getElementById('comm-gate'), main=document.getElementById('comm-main');
+      if(isLoggedIn()){ gate.style.display='none'; main.style.display='block'; renderFriends(); renderSearch(); renderRequests(); }
+      else { gate.style.display='flex'; main.style.display='none'; }
+    }
+    if(go==='play') renderPlayFriends();
+  }
+  document.querySelectorAll('.nav').forEach(n=>n.addEventListener('click',()=>showView(n.dataset.go)));
+  document.getElementById('home-play').addEventListener('click',()=>showView('play'));
+  document.getElementById('home-select').addEventListener('click',()=>showView('play'));
+
+  /* ---------- цвет акцента + фон ---------- */
+  const SOURCE_ACCENT={modrinth:'#2FD06E',curseforge:'#FB8C3C'};
+  let accentColor='#4C8DFF', reactive=true;
+  function applyAccent(){ const c=(reactive&&SOURCE_ACCENT[currentView])?SOURCE_ACCENT[currentView]:accentColor; root.style.setProperty('--accent',c); }
+  document.querySelectorAll('.sw-p').forEach(s=>s.addEventListener('click',()=>{ accentColor=s.dataset.c; document.querySelectorAll('.sw-p').forEach(x=>x.classList.toggle('sel',x.dataset.c===accentColor)); applyAccent(); }));
+
+  /* ---------- мобильное меню ---------- */
+  document.getElementById('burger').addEventListener('click',e=>{e.stopPropagation();body.classList.toggle('drawer-open');});
+  document.getElementById('backdrop').addEventListener('click',()=>body.classList.remove('drawer-open'));
+
+  /* ---------- модалки ---------- */
+  function openModal(id){document.getElementById(id).classList.add('show');}
+  function closeModal(id){document.getElementById(id).classList.remove('show');}
+  document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m && m.id!=='onboarding') closeModal(m.id); }));
+
+  /* ---------- каталог ---------- */
+  let activeCat={modrinth:'mod',curseforge:'mod'};
+  function cardHTML(it){
+    const desc=(lang==='en'&&it.descEn)?it.descEn:it.desc; const done=isInstalled(it.id);
+    return '<div class="mod" data-id="'+it.id+'"><div class="icon">'+it.icon+'</div><div class="mbody"><h4>'+it.name+' <em>· '+it.author+'</em></h4><p>'+desc+'</p><div class="mfoot"><span class="dl">'+dlSvg+it.dl+'</span><button class="install'+(done?' done':'')+'" data-mod="'+it.id+'">'+(done?T[lang].installed:T[lang].install)+'</button></div></div></div>';
+  }
+  function renderGrid(source){
+    const grid=document.getElementById('grid-'+source);
+    const items=CONTENT[source].filter(x=>x.cat===activeCat[source]);
+    grid.innerHTML = items.length ? items.map(cardHTML).join('') : '<div class="empty"><div class="empty-emoji">🔍</div><p>'+T[lang].empty+'</p></div>';
+    grid.querySelectorAll('.mod').forEach(card=>{
+      card.addEventListener('click',()=>openModForId(card.dataset.id));
+      card.querySelector('.install').addEventListener('click',e=>{e.stopPropagation();openInstallPicker(card.dataset.id);});
+    });
+  }
+  document.querySelectorAll('.chips').forEach(group=>{
+    const source=group.dataset.source;
+    group.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+      group.querySelectorAll('.chip').forEach(x=>x.classList.remove('on')); c.classList.add('on');
+      if(source){ activeCat[source]=c.dataset.cat; renderGrid(source); }
+    }));
+  });
+
+  /* ---------- окно мода ---------- */
+  let modalModId=null;
+  function openModForId(id){
+    const it=findItem(id); if(!it)return; modalModId=id;
+    document.getElementById('mod-icon').textContent=it.icon;
+    document.getElementById('mod-name').textContent=it.name;
+    document.getElementById('mod-author').textContent=it.author;
+    document.getElementById('mod-desc').textContent=(lang==='en'&&it.descEn)?it.descEn:it.desc;
+    refreshInstallButtons(); openModal('mod-modal');
+  }
+  document.getElementById('mod-close').addEventListener('click',()=>closeModal('mod-modal'));
+  document.getElementById('mod-install').addEventListener('click',()=>{ if(modalModId) openInstallPicker(modalModId); });
+  function refreshInstallButtons(){
+    document.querySelectorAll('.mod .install[data-mod]').forEach(b=>{ const d=isInstalled(b.dataset.mod); b.classList.toggle('done',d); b.textContent=d?T[lang].installed:T[lang].install; });
+    if(modalModId){ const mi=document.getElementById('mod-install'); const d=isInstalled(modalModId); mi.dataset.mod=modalModId; mi.classList.toggle('done',d); mi.textContent=d?T[lang].installed:T[lang].install; }
+  }
+
+  /* ---------- установка в сборку ---------- */
+  let currentInstallMod=null;
+  function openInstallPicker(modId){ currentInstallMod=modId; renderPicker(); openModal('install-modal'); }
+  function renderPicker(){
+    const it=findItem(currentInstallMod);
+    document.getElementById('pick-mod-name').textContent=it?it.name:'';
+    const list=document.getElementById('pick-list');
+    if(!instances.length){ list.innerHTML='<div class="pick-empty">'+T[lang].noInst+'</div>'; return; }
+    list.innerHTML=instances.map(i=>{ const has=i.mods.includes(currentInstallMod);
+      return '<div class="pick-row" data-iid="'+i.id+'"><div><b>'+i.name+'</b><span class="pr-sub">'+i.loader+' · '+i.version+' · '+i.mods.length+' '+T[lang].mods+'</span></div><div class="pick-btn'+(has?' on':'')+'">'+(has?T[lang].added:T[lang].add)+'</div></div>'; }).join('');
+    list.querySelectorAll('.pick-row').forEach(r=>r.addEventListener('click',()=>toggleInstall(r.dataset.iid)));
+  }
+  function toggleInstall(iid){
+    const inst=instances.find(x=>x.id===iid); const k=inst.mods.indexOf(currentInstallMod);
+    if(k>=0) inst.mods.splice(k,1); else inst.mods.push(currentInstallMod);
+    renderPicker(); refreshInstallButtons(); renderInstances();
+  }
+  document.getElementById('pick-close').addEventListener('click',()=>closeModal('install-modal'));
+  document.getElementById('pick-create').addEventListener('click',()=>{ closeModal('install-modal'); openCreate(true); });
+
+  /* ---------- создание сборки ---------- */
+  let createFromPicker=false;
+  function openCreate(fromPicker){ createFromPicker=fromPicker; document.getElementById('ci-name').value=''; openModal('create-modal'); }
+  document.getElementById('create-close').addEventListener('click',()=>closeModal('create-modal'));
+  document.getElementById('create-link').addEventListener('click',()=>openCreate(false));
+  document.getElementById('ci-create').addEventListener('click',()=>{
+    const name=document.getElementById('ci-name').value.trim()||(lang==='en'?'New instance':'Новая сборка');
+    instances.push({id:'i'+(idc++),name:name,version:document.getElementById('ci-version').value,loader:document.getElementById('ci-loader').value,mods:[]});
+    renderInstances(); updateHomeSelect(); closeModal('create-modal');
+    if(createFromPicker) openInstallPicker(currentInstallMod);
+  });
+
+  /* ---------- сборки ---------- */
+  function renderInstances(){
+    const grid=document.getElementById('instances-grid');
+    if(!instances.length){ grid.innerHTML='<div class="empty"><div class="empty-emoji">📦</div><p>'+T[lang].noInst+'</p><button class="mini-btn" id="empty-create">'+T[lang].createFirst+'</button></div>';
+      document.getElementById('empty-create').addEventListener('click',()=>openCreate(false)); return; }
+    grid.innerHTML=instances.map(i=>'<div class="inst" data-iid="'+i.id+'"><div class="thumb">'+loaderIcon(i.loader)+'</div><div class="meta"><b>'+i.name+'</b><span>'+i.loader+' · '+i.version+' · '+i.mods.length+' '+T[lang].mods+'</span><div class="inst-actions"><button class="btn-launch">▶ '+T[lang].play+'</button><button class="inst-del" title="delete">🗑</button></div></div></div>').join('');
+    grid.querySelectorAll('.inst').forEach(card=>{
+      const id=card.dataset.iid;
+      card.querySelector('.btn-launch').addEventListener('click',function(){ if(this.dataset.run)return; this.dataset.run=1; const o=this.textContent; this.textContent=T[lang].launching; setTimeout(()=>{this.textContent=o;this.removeAttribute('data-run');},1800); });
+      card.querySelector('.inst-del').addEventListener('click',()=>{ instances=instances.filter(x=>x.id!==id); renderInstances(); updateHomeSelect(); refreshInstallButtons(); });
+    });
+  }
+  function updateHomeSelect(){
+    const sel=document.getElementById('home-select');
+    if(instances.length) sel.innerHTML=instances[0].name+' <small>· '+instances[0].version+'</small>';
+    else sel.textContent=T[lang].noInstShort;
+  }
+
+  /* ---------- профиль ---------- */
+  function refreshAccountChip(){
+    const av=document.getElementById('acc-avatar');
+    const pill=document.getElementById('status-pill');
+    if(isLoggedIn()){
+      const nm=profile.name||currentUser;
+      if(profile.avatar){ av.style.backgroundImage='url('+profile.avatar+')'; av.textContent=''; } else { av.style.backgroundImage=''; av.textContent=(nm[0]||'P').toUpperCase(); }
+      document.getElementById('acc-name').textContent=nm;
+      document.getElementById('acc-tag').textContent='@'+profile.username;
+      if(pill) pill.style.display='flex';
+    } else {
+      av.style.backgroundImage=''; av.textContent='?';
+      document.getElementById('acc-name').textContent = lang==='en'?'Sign in':'Войти';
+      document.getElementById('acc-tag').textContent = lang==='en'?'UnlimitedMC account':'Аккаунт UnlimitedMC';
+      if(pill) pill.style.display='none';
+    }
+  }
+  let lastShown={p:null,own:true};
+  function showProfile(p,own){
+    lastShown={p,own};
+    const nm=(own?(p.name||localName):(p.name))||T[lang].noName;
+    document.getElementById('pf-name').textContent=nm;
+    document.getElementById('pf-user').textContent=p.username?'@'+p.username:T[lang].noUser;
+    document.getElementById('pf-bio').textContent=p.bio||T[lang].noBio;
+    const hd=document.getElementById('pf-header'); hd.style.backgroundImage=(own&&p.header)?'url('+p.header+')':'';
+    const av=document.getElementById('pf-avatar');
+    if(own){ if(p.avatar){av.style.backgroundImage='url('+p.avatar+')';av.style.background='';av.textContent='';} else {av.style.backgroundImage='';av.style.background='';av.textContent=(nm[0]||'P').toUpperCase();} }
+    else { av.style.backgroundImage='none'; av.style.background=p.color||''; av.textContent=p.emoji||(nm[0]||'?'); }
+    const favIds=own?(p.favMods||[]):(p.fav||[]);
+    const mc=document.getElementById('pf-mods');
+    mc.innerHTML = favIds.length ? favIds.map(id=>{const it=findItem(id);return it?'<div class="pf-mod">'+it.icon+' '+it.name+'</div>':'';}).join('') : '<span style="color:var(--muted);font-size:13px">'+T[lang].notSel+'</span>';
+    const sc=document.getElementById('pf-socials'); let s='';
+    if(p.tg) s+='<div class="pf-soc">✈️ Telegram</div>';
+    if(p.yt) s+='<div class="pf-soc">▶️ YouTube</div>';
+    if(p.dc) s+='<div class="pf-soc">💬 Discord</div>';
+    sc.innerHTML = s || '<span style="color:var(--muted);font-size:13px">'+T[lang].noLinks+'</span>';
+    const act=document.getElementById('pf-activity');
+    if(act){
+      const v=(typeof vis==='function')?vis(p.status):'';
+      if(!own && p.playing && (v==='online'||v==='dnd')){
+        act.style.display='block';
+        const sec='<div class="pf-sec">'+(lang==='en'?'Currently in game':'Сейчас в игре')+'</div>';
+        if(v==='online'){
+          act.innerHTML=sec+'<div class="pf-act"><div class="pf-act-row"><span class="pf-act-k">'+(lang==='en'?'World':'Мир')+'</span><b>'+p.playing.world+'</b></div><div class="pf-act-row"><span class="pf-act-k">'+(lang==='en'?'Play time':'Время в игре')+'</span><b>'+fmtTime(p.playing.mins)+'</b></div><div class="pf-act-sub">'+p.playing.instance+' · '+p.playing.version+'</div></div>';
+        } else {
+          act.innerHTML=sec+'<div class="pf-act"><div class="pf-act-row"><span class="pf-act-k">'+(lang==='en'?'Play time':'Время в игре')+'</span><b>'+fmtTime(p.playing.mins)+'</b></div></div>';
+        }
+      } else { act.style.display='none'; act.innerHTML=''; }
+    }
+    document.getElementById('pf-edit').style.display=own?'block':'none';
+    var lo=document.getElementById('pf-logout'); if(lo) lo.style.display=own?'block':'none';
+  }
+  function renderProfile(){ if(lastShown.p) showProfile(lastShown.p,lastShown.own); else showProfile(profile,true); }
+
+  /* ---------- аккаунт UnlimitedMC (регистрация / вход) ---------- */
+  let users={}, currentUser=null, authMode='login', authNext=null;
+  function isLoggedIn(){ return !!currentUser; }
+  function guestProfile(){ return {name:'',username:'',bio:'',avatar:null,header:null,favMods:[],tg:'',yt:'',dc:''}; }
+  function openAuth(next){
+    authNext=next||null; setAuthMode('login');
+    document.getElementById('auth-user').value=''; document.getElementById('auth-pass').value='';
+    document.getElementById('auth-err').textContent='';
+    openModal('auth-modal');
+    setTimeout(()=>document.getElementById('auth-user').focus(),60);
+  }
+  function setAuthMode(m){
+    authMode=m;
+    document.querySelectorAll('.auth-tab').forEach(t=>t.classList.toggle('on',t.dataset.atab===m));
+    const reg=m==='register';
+    document.getElementById('auth-title').textContent=reg?(lang==='en'?'Create account':'Регистрация'):(lang==='en'?'Sign in':'Вход');
+    document.getElementById('auth-submit').textContent=reg?(lang==='en'?'Create account':'Создать аккаунт'):(lang==='en'?'Sign in':'Войти');
+    document.getElementById('auth-err').textContent='';
+  }
+  function doAuth(){
+    const u=document.getElementById('auth-user').value.trim();
+    const p=document.getElementById('auth-pass').value;
+    const err=document.getElementById('auth-err');
+    if(u.length<3){ err.textContent=lang==='en'?'Username is too short':'Слишком короткий юзернейм'; return; }
+    if(!/^[a-zA-Z0-9_]+$/.test(u)){ err.textContent=lang==='en'?'Latin letters, digits and _ only':'Только латиница, цифры и _'; return; }
+    if(p.length<4){ err.textContent=lang==='en'?'Password is at least 4 characters':'Пароль минимум 4 символа'; return; }
+    const key=u.toLowerCase();
+    if(authMode==='register'){
+      if(users[key]){ err.textContent=lang==='en'?'This account already exists':'Такой аккаунт уже существует'; return; }
+      const prof=guestProfile(); prof.username=u; prof.name=u;
+      users[key]={password:p, profile:prof};
+      currentUser=key;
+    } else {
+      const acc=users[key];
+      if(!acc || acc.password!==p){ err.textContent=lang==='en'?'Wrong username or password':'Неверный юзернейм или пароль'; return; }
+      currentUser=key;
+    }
+    profile=users[currentUser].profile;
+    closeModal('auth-modal');
+    refreshAccountChip();
+    const n=authNext; authNext=null;
+    if(n==='profile') openProfilePage(profile,true);
+    else if(n==='community') showView('community');
+    else if(n==='edit') openProfileEdit();
+  }
+  function logout(){
+    currentUser=null; profile=guestProfile(); refreshAccountChip();
+    if(currentView==='profile'||currentView==='community') showView('home');
+  }
+  function setPageTitle(t,s){ document.getElementById('ptitle').textContent=t; document.getElementById('psub').textContent=s||''; }
+  function openProfilePage(p,own){ if(currentView!=='profile'&&currentView!=='article') backTo=currentView; showProfile(p,own); showView('profile'); setPageTitle(lang==='en'?'Profile':'Профиль', own?(lang==='en'?'Your profile':'Ваш профиль'):'@'+(p.username||'')); }
+  function fillArticle(id){
+    const n=NEWS.find(x=>x.id===id); if(!n)return; lastArticle=id;
+    document.getElementById('art-cover').textContent=n.cover;
+    document.getElementById('art-tag').textContent=(lang==='en'&&n.tagEn)?n.tagEn:n.tag;
+    document.getElementById('art-title').textContent=(lang==='en'&&n.titleEn)?n.titleEn:n.title;
+    document.getElementById('art-date').textContent=(lang==='en'&&n.dateEn)?n.dateEn:n.date;
+    const body=(lang==='en'&&n.bodyEn)?n.bodyEn:n.body;
+    document.getElementById('art-body').innerHTML=body.map(p=>'<p>'+p+'</p>').join('');
+  }
+  function openArticlePage(id){ if(currentView!=='profile'&&currentView!=='article') backTo=currentView; fillArticle(id); showView('article'); setPageTitle(lang==='en'?'News':'Новости',''); }
+  function newsCardHTML(n){
+    const tag=(lang==='en'&&n.tagEn)?n.tagEn:n.tag, title=(lang==='en'&&n.titleEn)?n.titleEn:n.title, sum=(lang==='en'&&n.sumEn)?n.sumEn:n.sum;
+    return '<div class="news" data-news="'+n.id+'"><div class="cover">'+n.cover+'</div><div class="nbody"><div class="ntag">'+tag+'</div><h4>'+title+'</h4><p>'+sum+'</p></div></div>';
+  }
+  function renderNews(){
+    ['mc','umc'].forEach(g=>{ const el=document.getElementById('news-'+g); if(!el)return; el.innerHTML=NEWS.filter(n=>n.group===g).map(newsCardHTML).join(''); el.querySelectorAll('.news').forEach(c=>c.addEventListener('click',()=>openArticlePage(c.dataset.news))); });
+  }
+  document.getElementById('account').addEventListener('click',()=> isLoggedIn()?openProfilePage(profile,true):openAuth('profile'));
+  document.getElementById('auth-close').addEventListener('click',()=>closeModal('auth-modal'));
+  document.querySelectorAll('.auth-tab').forEach(t=>t.addEventListener('click',()=>setAuthMode(t.dataset.atab)));
+  document.getElementById('auth-submit').addEventListener('click',doAuth);
+  document.getElementById('auth-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
+  document.getElementById('auth-user').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('auth-pass').focus(); });
+  document.getElementById('comm-login').addEventListener('click',()=>openAuth('community'));
+  document.getElementById('pf-logout').addEventListener('click',logout);
+  document.getElementById('pf-back').addEventListener('click',()=>showView(backTo));
+  document.getElementById('art-back').addEventListener('click',()=>showView(backTo));
+  document.getElementById('pf-edit').addEventListener('click',openProfileEdit);
+
+  /* ---------- редактирование профиля ---------- */
+  let tempAvatar=null, tempHeader=null, tempFav=[];
+  function readImage(input,cb){ const f=input.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsDataURL(f); }
+  function renderFavPicker(){
+    const wrap=document.getElementById('pe-fav');
+    wrap.innerHTML=ALL.map(it=>{ const on=tempFav.includes(it.id); const dis=!on&&tempFav.length>=3;
+      return '<div class="fav-chip'+(on?' on':'')+(dis?' disabled':'')+'" data-id="'+it.id+'">'+it.icon+' '+it.name+'</div>'; }).join('');
+    document.getElementById('pe-fav-count').textContent=tempFav.length;
+    wrap.querySelectorAll('.fav-chip').forEach(c=>c.addEventListener('click',()=>{ const id=c.dataset.id; const k=tempFav.indexOf(id); if(k>=0) tempFav.splice(k,1); else { if(tempFav.length>=3) return; tempFav.push(id); } renderFavPicker(); }));
+  }
+  let editBack='profile';
+  function openProfileEdit(){
+    editBack = (currentView==='profile-edit') ? editBack : currentView;
+    document.getElementById('pe-name').value=profile.name;
+    document.getElementById('pe-user').value=profile.username;
+    document.getElementById('pe-bio').value=profile.bio;
+    document.getElementById('pe-tg').value=profile.tg;
+    document.getElementById('pe-yt').value=profile.yt;
+    document.getElementById('pe-dc').value=profile.dc;
+    tempAvatar=profile.avatar; tempHeader=profile.header; tempFav=[...profile.favMods];
+    const ap=document.getElementById('pe-avatar-prev'); if(tempAvatar){ap.style.backgroundImage='url('+tempAvatar+')';ap.textContent='';}else{ap.style.backgroundImage='';ap.textContent='🙂';}
+    const hp=document.getElementById('pe-header-prev'); if(tempHeader){hp.style.backgroundImage='url('+tempHeader+')';hp.textContent='';}else{hp.style.backgroundImage='';hp.textContent='🖼️';}
+    renderFavPicker(); showView('profile-edit'); setPageTitle(lang==='en'?'Edit profile':'Редактирование профиля','');
+  }
+  document.getElementById('pe-back').addEventListener('click',()=>{ showView(editBack); if(editBack==='profile') renderProfile(); });
+  document.getElementById('pe-avatar-file').addEventListener('change',function(){ readImage(this,d=>{ tempAvatar=d; const p=document.getElementById('pe-avatar-prev'); p.style.backgroundImage='url('+d+')'; p.textContent=''; }); });
+  document.getElementById('pe-header-file').addEventListener('change',function(){ readImage(this,d=>{ tempHeader=d; const p=document.getElementById('pe-header-prev'); p.style.backgroundImage='url('+d+')'; p.textContent=''; }); });
+  document.getElementById('pe-save').addEventListener('click',()=>{
+    profile.name=document.getElementById('pe-name').value.trim();
+    profile.username=document.getElementById('pe-user').value.trim().replace(/^@/,'');
+    profile.bio=document.getElementById('pe-bio').value.trim();
+    profile.tg=document.getElementById('pe-tg').value.trim();
+    profile.yt=document.getElementById('pe-yt').value.trim();
+    profile.dc=document.getElementById('pe-dc').value.trim();
+    profile.avatar=tempAvatar; profile.header=tempHeader; profile.favMods=[...tempFav];
+    refreshAccountChip(); renderProfile(); showView(editBack);
+  });
+
+  /* ---------- настройки: профиль/имя/гайд/ссылка ---------- */
+  document.getElementById('set-edit-profile').addEventListener('click',()=> isLoggedIn()?openProfileEdit():openAuth('edit'));
+  document.getElementById('set-change-name').addEventListener('click',()=>{ obNick.value=(localName==='Гость'||localName==='Guest')?'':localName; openModal('onboarding'); obGo(NICK_STEP); });
+  document.getElementById('set-replay').addEventListener('click',()=>{ openModal('onboarding'); obGo(0); });
+  document.getElementById('gen-link').addEventListener('click',()=>{
+    const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const t=Array.from({length:26},()=>alphabet[Math.floor(Math.random()*alphabet.length)]).join('');
+    document.getElementById('otl-code').textContent='https://umclaunch.net/auth/'+t;
+    document.getElementById('otl-box').style.display='block';
+  });
+
+  /* ---------- ОНБОРДИНГ ---------- */
+  const obSteps=document.querySelectorAll('.ob-step'); const OB_TOTAL=obSteps.length; const NICK_STEP=3;
+  const obTrack=document.getElementById('ob-track'),obBack=document.getElementById('ob-back'),obNext=document.getElementById('ob-next'),obDots=document.getElementById('ob-dots'),obNick=document.getElementById('ob-nick'),obSkip=document.getElementById('ob-skip');
+  let obStep=0;
+  for(let i=0;i<OB_TOTAL;i++){const d=document.createElement('div');d.className='ob-dot'+(i===0?' on':'');d.addEventListener('click',()=>obGo(i));obDots.appendChild(d);}
+  function obCurrentNick(){ return obNick.value.trim()||T[lang].defName; }
+  function obSyncLabels(){ obNext.textContent=obStep===OB_TOTAL-1?T[lang].start:T[lang].next; if(obStep===OB_TOTAL-1) document.getElementById('ob-done-title').textContent=T[lang].done.replace('{n}',obCurrentNick()); }
+  function obGo(i){
+    obStep=Math.max(0,Math.min(OB_TOTAL-1,i));
+    obTrack.style.transform='translateX(-'+(obStep*100)+'%)';
+    obSteps.forEach((s,idx)=>s.classList.toggle('active',idx===obStep));
+    obDots.querySelectorAll('.ob-dot').forEach((d,idx)=>d.classList.toggle('on',idx===obStep));
+    obBack.style.visibility=obStep===0?'hidden':'visible'; obSkip.style.display=obStep===OB_TOTAL-1?'none':'block'; obSyncLabels();
+  }
+  function obFinish(){ localName=obCurrentNick(); refreshAccountChip(); refreshGreeting(); closeModal('onboarding'); }
+  obNext.addEventListener('click',()=>{ if(obStep===OB_TOTAL-1) obFinish(); else obGo(obStep+1); });
+  obBack.addEventListener('click',()=>obGo(obStep-1));
+  obSkip.addEventListener('click',obFinish);
+  obNick.addEventListener('keydown',e=>{ if(e.key==='Enter') obGo(obStep+1); });
+  obNick.addEventListener('input',obSyncLabels);
+  obGo(0);
+
+  function refreshGreeting(){ const arr=GREET[lang]; const g=document.getElementById('greeting'); if(g) g.textContent=arr[Math.floor(Math.random()*arr.length)].replace('{n}',localName); }
+
+  /* ---------- аккаунт для игры ---------- */
+  document.querySelectorAll('#acc-seg .seg-opt').forEach(o=>o.addEventListener('click',()=>{ document.querySelectorAll('#acc-seg .seg-opt').forEach(x=>x.classList.remove('on')); o.classList.add('on'); document.querySelectorAll('.acc-pane').forEach(p=>p.classList.toggle('on',p.dataset.accPane===o.dataset.acc)); }));
+
+  /* ---------- реактивный фон + ОЗУ ---------- */
+  const rt=document.getElementById('reactive-toggle');
+  rt.addEventListener('click',()=>{rt.classList.toggle('on');reactive=rt.classList.contains('on');applyAccent();});
+  const ramVals=[4,6,8,12,16];let ri=1;const ram=document.getElementById('ram');
+  ram.addEventListener('click',()=>{ri=(ri+1)%ramVals.length;ram.textContent=ramVals[ri]+' '+T[lang].ram;});
+
+  /* ---------- реклама ---------- */
+  document.getElementById('ad-x').addEventListener('click',()=>document.getElementById('ad').remove());
+
+  /* ---------- статус (свой) ---------- */
+  const statusPill=document.getElementById('status-pill'), statusMenu=document.getElementById('status-menu');
+  statusPill.addEventListener('click',e=>{e.stopPropagation();statusMenu.classList.toggle('open');});
+  document.addEventListener('click',()=>statusMenu.classList.remove('open'));
+  statusMenu.addEventListener('click',e=>e.stopPropagation());
+  statusMenu.querySelectorAll('.status-opt').forEach(o=>o.addEventListener('click',()=>{ myStatus=o.dataset.st; refreshStatus(); statusMenu.classList.remove('open'); }));
+  function refreshStatus(){
+    const st=STATUS[myStatus];
+    document.getElementById('status-dot').style.background=st.dot;
+    document.getElementById('status-label').textContent=lang==='en'?st.en:st.ru;
+    document.getElementById('acc-avatar').style.setProperty('--st',st.dot);
+    statusMenu.querySelectorAll('.status-opt').forEach(o=>o.classList.toggle('on',o.dataset.st===myStatus));
+  }
+
+  /* ---------- сообщество: вкладки и заявки ---------- */
+  document.querySelectorAll('.comm-tabs .seg-opt').forEach(o=>o.addEventListener('click',()=>{ document.querySelectorAll('.comm-tabs .seg-opt').forEach(x=>x.classList.remove('on')); o.classList.add('on'); document.querySelectorAll('.comm-pane').forEach(p=>p.classList.toggle('on',p.dataset.cpane===o.dataset.ctab)); }));
+  const reqBtn=document.getElementById('req-btn'), reqMenu=document.getElementById('req-menu');
+  reqBtn.addEventListener('click',e=>{e.stopPropagation();reqMenu.classList.toggle('open');});
+  document.addEventListener('click',()=>reqMenu.classList.remove('open'));
+  reqMenu.addEventListener('click',e=>e.stopPropagation());
+  document.getElementById('usr-search').addEventListener('input',renderSearch);
+
+  function joinHandler(){ if(this.classList.contains('closed'))return; const o=this.textContent; this.textContent=T[lang].connecting; this.style.pointerEvents='none'; setTimeout(()=>{this.textContent=o;this.style.pointerEvents='';},1800); }
+  function actLines(f){
+    const v=vis(f.status);
+    if(v==='online'&&f.playing) return '<div class="uplay"><b>'+f.playing.instance+'</b> · '+f.playing.version+'<br>'+f.playing.world+' · '+fmtTime(f.playing.mins)+'</div>';
+    if(v==='dnd'&&f.playing) return '<div class="uplay">'+T[lang].inGame+' · '+fmtTime(f.playing.mins)+'</div>';
+    return '';
+  }
+  function friendCardHTML(f){
+    const v=vis(f.status), st=STATUS[v];
+    let join=''; if(v==='online'&&f.playing) join='<button class="ubtn join'+(f.playing.open?'':' closed')+'" data-join="'+f.username+'">'+T[lang].join+'</button>';
+    return '<div class="usr"><div class="uav" style="background:'+f.color+'">'+f.emoji+'<span class="ud" style="background:'+st.dot+'"></span></div>'
+      +'<div class="ubody"><b>'+f.name+'</b><div class="uu">@'+f.username+'</div><div class="ust"><span class="sd" style="background:'+st.dot+'"></span>'+(lang==='en'?st.en:st.ru)+'</div>'+actLines(f)+'</div>'
+      +'<div class="uact"><button class="ubtn ghost prof" data-u="'+f.username+'">'+T[lang].profileBtn+'</button>'+join+'</div></div>';
+  }
+  function renderFriends(){
+    const list=document.getElementById('friends-list'); document.getElementById('friends-count').textContent=friends.length;
+    list.innerHTML = friends.length ? friends.map(friendCardHTML).join('') : '<div class="empty"><div class="empty-emoji">🙂</div><p>'+T[lang].noFriends+'</p></div>';
+    list.querySelectorAll('.prof').forEach(b=>b.addEventListener('click',()=>{ const f=friends.find(x=>x.username===b.dataset.u); if(f) openProfilePage(f,false); }));
+    list.querySelectorAll('[data-join]').forEach(b=>b.addEventListener('click',joinHandler));
+  }
+  function searchCardHTML(p){
+    const st=STATUS[vis(p.status)], isF=friends.some(f=>f.username===p.username), isS=sent.has(p.username);
+    let btn = isF?'<button class="ubtn done">'+T[lang].inFriends+'</button>':(isS?'<button class="ubtn disabled">'+T[lang].sent+'</button>':'<button class="ubtn add" data-add="'+p.username+'">'+T[lang].addFriend+'</button>');
+    return '<div class="usr"><div class="uav" style="background:'+p.color+'">'+p.emoji+'<span class="ud" style="background:'+st.dot+'"></span></div>'
+      +'<div class="ubody"><b>'+p.name+'</b><div class="uu">@'+p.username+'</div><div class="ust"><span class="sd" style="background:'+st.dot+'"></span>'+(lang==='en'?st.en:st.ru)+'</div></div>'
+      +'<div class="uact"><button class="ubtn ghost prof" data-u="'+p.username+'">'+T[lang].profileBtn+'</button>'+btn+'</div></div>';
+  }
+  function renderSearch(){
+    const q=(document.getElementById('usr-search').value||'').trim().toLowerCase();
+    const res=PLAYERS.filter(p=>!q||p.username.toLowerCase().includes(q)||p.name.toLowerCase().includes(q));
+    const grid=document.getElementById('search-results');
+    grid.innerHTML = res.length ? res.map(searchCardHTML).join('') : '<div class="empty"><div class="empty-emoji">🔍</div><p>'+T[lang].empty+'</p></div>';
+    grid.querySelectorAll('.prof').forEach(b=>b.addEventListener('click',()=>{ const p=PLAYERS.find(x=>x.username===b.dataset.u); if(p) openProfilePage(p,false); }));
+    grid.querySelectorAll('.add').forEach(b=>b.addEventListener('click',()=>{ sent.add(b.dataset.add); renderSearch(); }));
+  }
+  function renderRequests(){
+    const badge=document.getElementById('req-badge'); badge.textContent=requests.length; badge.style.display=requests.length?'grid':'none';
+    const wrap=document.getElementById('req-list');
+    if(!requests.length){ wrap.innerHTML='<div class="req-empty">'+T[lang].noRequests+'</div>'; return; }
+    wrap.innerHTML=requests.map(r=>'<div class="req-row"><div class="uav" style="background:'+r.color+';width:30px;height:30px;font-size:15px">'+r.emoji+'</div><div style="min-width:0"><b style="font-size:13px;display:block">'+r.name+'</b><div style="font-size:11px;color:var(--muted)">@'+r.username+'</div></div><div class="rm-act"><div class="req-ic ok" data-acc="'+r.username+'">✓</div><div class="req-ic no" data-dec="'+r.username+'">✕</div></div></div>').join('');
+    wrap.querySelectorAll('[data-acc]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();acceptReq(b.dataset.acc);}));
+    wrap.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();requests=requests.filter(x=>x.username!==b.dataset.dec);renderRequests();}));
+  }
+  function acceptReq(u){
+    const r=requests.find(x=>x.username===u); if(!r)return;
+    friends.push(Object.assign({},r,{status:'online',playing:null}));
+    requests=requests.filter(x=>x.username!==u);
+    renderRequests(); renderFriends(); renderPlayFriends(); renderSearch();
+  }
+  function fpCardHTML(f){
+    const v=vis(f.status), st=STATUS[v]; let body='', join='';
+    if(v==='online'&&f.playing){ body='<div class="uplay"><b>'+f.playing.instance+'</b> · '+f.playing.version+'<br>'+f.playing.world+' · '+fmtTime(f.playing.mins)+'</div>'; join='<button class="ubtn join'+(f.playing.open?'':' closed')+'" data-join="'+f.username+'" style="margin-top:10px;width:100%">'+T[lang].join+'</button>'; }
+    else if(v==='dnd'&&f.playing){ body='<div class="uplay">'+T[lang].inGame+' · '+fmtTime(f.playing.mins)+'</div>'; }
+    return '<div class="fp-card"><div class="fp-top"><div class="uav" style="background:'+f.color+';width:38px;height:38px;font-size:18px">'+f.emoji+'<span class="ud" style="background:'+st.dot+'"></span></div><div style="min-width:0"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+f.name+'</b><div style="font-size:11px;color:var(--muted)">@'+f.username+'</div></div></div>'+body+join+'</div>';
+  }
+  function renderPlayFriends(){
+    const wrap=document.getElementById('fp-scroll');
+    const playing=friends.filter(f=>{const v=vis(f.status);return (v==='online'||v==='dnd')&&f.playing;});
+    if(!playing.length){ wrap.innerHTML='<div class="fp-empty">'+T[lang].noFriendsPlaying+'</div>'; return; }
+    wrap.innerHTML=playing.map(fpCardHTML).join('');
+    wrap.querySelectorAll('[data-join]').forEach(b=>b.addEventListener('click',joinHandler));
+  }
+
+  /* ---------- старт ---------- */
+  applyAccent(); refreshAccountChip(); refreshGreeting(); renderProfile(); renderGrid('modrinth'); renderGrid('curseforge'); renderInstances(); updateHomeSelect();
+  refreshStatus(); renderFriends(); renderSearch(); renderRequests(); renderPlayFriends(); renderNews();
+</script>
+</body>
+</html>

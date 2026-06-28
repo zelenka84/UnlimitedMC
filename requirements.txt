@@ -1,0 +1,3 @@
+PySide6>=6.5
+minecraft-launcher-lib>=6.4
+requests>=2.28
