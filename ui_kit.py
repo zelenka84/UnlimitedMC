@@ -637,6 +637,15 @@ QPushButton#launch:hover {{ background:{g}; color:{on_accent}; border:none; }}
 QPushButton#install {{ background:{accent_soft}; color:{accent}; border:1px solid {border_strong};
     border-radius:9px; padding:7px 14px; font-weight:600; }}
 QPushButton#install:hover {{ border:1px solid {border_strong}; }}
+QPushButton#remove {{ background:{rgba('#FF5C7A',0.12)}; color:#FF8088;
+    border:1px solid {rgba('#FF5C7A',0.35)}; border-radius:9px; padding:7px 14px; font-weight:600; }}
+QPushButton#remove:hover {{ background:{rgba('#FF5C7A',0.20)}; border:1px solid {rgba('#FF5C7A',0.55)}; }}
+QPushButton#page {{ background:{surface}; border:1px solid {border}; border-radius:8px;
+    min-width:20px; padding:7px 11px; color:{muted}; font-weight:600; }}
+QPushButton#page:hover {{ color:{text}; border:1px solid {border_strong}; }}
+QPushButton#page:disabled {{ color:{rgba(muted,0.35)}; border:1px solid {border}; }}
+QPushButton#pageCur {{ background:{g}; border:none; border-radius:8px;
+    min-width:20px; padding:7px 11px; color:{on_accent}; font-weight:700; }}
 QPushButton#segopt {{ background:transparent; border:none; border-radius:8px; padding:8px 16px;
     color:{muted}; font-weight:600; }}
 QPushButton#segopt:checked {{ background:{accent_soft}; color:{text}; }}

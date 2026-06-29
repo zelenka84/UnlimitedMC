@@ -273,6 +273,60 @@ def already_installed(inst: dict, filename: str) -> bool:
     return False
 
 
+def _project_pid(source: str, project: dict):
+    """Идентификатор проекта в его источнике (для сопоставления со списком модов сборки)."""
+    if source == "modrinth":
+        return project.get("project_id") or project.get("id") or project.get("slug")
+    return project.get("id")
+
+
+def installed_entry(inst: dict | None, source: str, project: dict) -> dict | None:
+    """Запись установленного мода в сборке по источнику+id проекта (или None)."""
+    if not inst:
+        return None
+    pid = _project_pid(source, project)
+    if pid is None:
+        return None
+    for m in inst.get("mods", []):
+        if m.get("source") == source and m.get("project_id") == pid:
+            return m
+    return None
+
+
+def remove_mod(inst: dict, entry: dict, progress_cb=None) -> dict:
+    """Удалить установленный мод: файл с диска и запись из списка сборки."""
+    fn = entry.get("filename")
+    if fn:
+        for sub in ("mods", "resourcepacks", "shaderpacks"):
+            p = instance_dir(inst) / sub / fn
+            try:
+                if p.exists():
+                    p.unlink()
+            except OSError:
+                pass  # файла уже нет / занят — запись всё равно убираем
+    inst["mods"] = [m for m in inst.get("mods", [])
+                    if not (m.get("source") == entry.get("source")
+                            and m.get("project_id") == entry.get("project_id")
+                            and m.get("filename") == entry.get("filename"))]
+    return entry
+
+
+def fetch_bytes(url: str, timeout: int = 20) -> bytes | None:
+    """Скачать небольшой ресурс целиком (иконку мода и т.п.). None при любой ошибке.
+
+    Идёт через общий ``_session`` — значит, учитывает прокси (важно для РФ: иконки
+    Modrinth лежат на том же заблокированном CDN, что и сам сайт).
+    """
+    if not url:
+        return None
+    try:
+        r = _session.get(url, timeout=timeout)
+        r.raise_for_status()
+        return r.content
+    except Exception:
+        return None
+
+
 def download_file(url: str, dest: Path, progress_cb=None) -> None:
     with _session.get(url, stream=True, timeout=120) as r:
         r.raise_for_status()
@@ -295,16 +349,21 @@ M_BASE = "https://api.modrinth.com/v2"
 
 def modrinth_search(query: str, project_type: str = "mod",
                     loader: str | None = None, mc_version: str | None = None,
-                    limit: int = 20) -> list[dict]:
+                    limit: int = 20, offset: int = 0) -> tuple[list[dict], int]:
+    """Возвращает (результаты, всего_найдено) — total нужен для постраничной навигации."""
     facets = [[f"project_type:{project_type}"]]
     if loader and loader != "vanilla" and project_type in ("mod", "modpack"):
         facets.append([f"categories:{loader}"])
     if mc_version:
         facets.append([f"versions:{mc_version}"])
-    params = {"query": query or "", "limit": limit, "facets": json.dumps(facets)}
+    params = {"query": query or "", "limit": limit, "offset": offset,
+              "facets": json.dumps(facets),
+              # без запроса сортируем по загрузкам → «самые популярные» сразу
+              "index": "relevance" if query else "downloads"}
     r = _session.get(f"{M_BASE}/search", params=params, timeout=20)
     r.raise_for_status()
-    return r.json().get("hits", [])
+    data = r.json()
+    return data.get("hits", []), int(data.get("total_hits", 0))
 
 
 def _modrinth_get_version(project_id: str, loader: str | None, mc_version: str | None,
@@ -397,7 +456,7 @@ CF_LOADER = {"forge": 1, "fabric": 4, "quilt": 5, "neoforge": 6}
 # Сменить ключ:  python tools/obfuscate_cf_key.py  → вставить новую строку ниже.
 # Приоритет: личный ключ пользователя из Настроек важнее встроенного.
 _VEIL = b"UnlimitedMC::cf::v1"
-CF_BUNDLED_KEY_OBF = "cVwNTVxZUAYQNxsCa1o2D3c0Rw8PVCgXBwYOSwIyXnYPHmJQM1cTQT1QDzgHF1cgC3IVNyFeCwVcYgMZ"
+CF_BUNDLED_KEY_OBF = "NggPNh0IADoCKXsJCAFWDgoXAmFcVVBdC0ZTVixwXgtbVA4IFAJkV15bDwsSAQd+c1sLVlIDXkcIN1peUVxfQ1ZTencDWVYA"
 
 
 def _bundled_key() -> str:
@@ -445,19 +504,23 @@ def _cf_get(url: str, key: str, **kwargs):
 
 def curseforge_search(key: str, query: str, project_type: str = "mod",
                       loader: str | None = None, mc_version: str | None = None,
-                      limit: int = 20) -> list[dict]:
+                      limit: int = 20, offset: int = 0) -> tuple[list[dict], int]:
+    """Возвращает (результаты, всего_найдено). Уже отсортировано по популярности."""
     if not key:
         raise CurseForgeAuthError(
             "Нет ключа CurseForge. Возьми бесплатный на console.curseforge.com и "
             "впиши его в Настройки → Ключ CurseForge.")
     params = {"gameId": CF_GAME, "classId": CF_CLASS.get(project_type, 6),
-              "searchFilter": query or "", "pageSize": limit, "sortField": 2, "sortOrder": "desc"}
+              "searchFilter": query or "", "pageSize": limit, "index": offset,
+              "sortField": 2, "sortOrder": "desc"}
     if mc_version:
         params["gameVersion"] = mc_version
     if loader and loader in CF_LOADER and project_type in ("mod", "modpack"):
         params["modLoaderType"] = CF_LOADER[loader]
     r = _cf_get(f"{CF_BASE}/mods/search", key, params=params)
-    return r.json().get("data", [])
+    body = r.json()
+    total = int(body.get("pagination", {}).get("totalCount", 0))
+    return body.get("data", []), total
 
 
 def _cf_pick_file(key: str, mod_id: int, loader: str | None, mc_version: str | None) -> dict | None:

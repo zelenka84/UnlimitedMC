@@ -21,9 +21,9 @@ import traceback
 
 from PySide6.QtCore import (
     Qt, QThreadPool, QRunnable, QObject, Signal, Slot, QPropertyAnimation,
-    QEasingCurve, QEvent, QSize,
+    QEasingCurve, QEvent, QSize, QRectF,
 )
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtGui import QFont, QColor, QPixmap, QPainter, QPainterPath
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QToolButton, QLineEdit, QComboBox, QSpinBox, QScrollArea,
@@ -58,19 +58,80 @@ class Worker(QRunnable):
         super().__init__()
         self.fn, self.args, self.kwargs = fn, args, kwargs
         self.signals = WorkerSignals()
+        # НЕ позволяем C++ удалять раннабл за нашей спиной: его жизнь держит
+        # Python-ссылка (MainWindow._workers) до сигнала finished. Иначе PySide
+        # мог собрать Worker/WorkerSignals прямо во время работы потока — отсюда
+        # «Signal source has been deleted» и редкие, но реальные вылеты лаунчера.
+        self.setAutoDelete(False)
+
+    def _emit(self, name, *a):
+        # При закрытии лаунчера во время фоновой задачи C++-объект signals может уже
+        # быть снесён — тогда emit бросает RuntimeError. Гасим: программа всё равно
+        # закрывается, ронять её на выходе незачем.
+        try:
+            getattr(self.signals, name).emit(*a)
+        except RuntimeError:
+            pass
 
     @Slot()
     def run(self):
         try:
             params = inspect.signature(self.fn).parameters
             if "progress_cb" in params and "progress_cb" not in self.kwargs:
-                self.kwargs["progress_cb"] = lambda s, v, m: self.signals.progress.emit(s, int(v), int(m))
-            self.signals.result.emit(self.fn(*self.args, **self.kwargs))
+                self.kwargs["progress_cb"] = lambda s, v, m: self._emit("progress", s, int(v), int(m))
+            self._emit("result", self.fn(*self.args, **self.kwargs))
         except Exception as e:  # noqa: BLE001 — ловим всё, лаунчер не должен падать
             traceback.print_exc()
-            self.signals.error.emit(str(e))
+            self._emit("error", str(e))
         finally:
-            self.signals.finished.emit()
+            self._emit("finished")
+
+
+def _pager_numbers(cur: int, pages: int) -> list[int | None]:
+    """Номера страниц для пейджера: первая, последняя и окно вокруг текущей.
+
+    None между числами означает «…» (пропуск). Напр. при cur=5, pages=20:
+    0 … 4 5 6 … 19.
+    """
+    if pages <= 7:
+        return list(range(pages))
+    wanted = sorted({0, pages - 1, cur - 1, cur, cur + 1}
+                    & set(range(pages)) | {0, pages - 1})
+    out: list[int | None] = []
+    prev = None
+    for p in wanted:
+        if prev is not None and p - prev > 1:
+            out.append(None)
+        out.append(p)
+        prev = p
+    return out
+
+
+def rounded_icon(data: bytes, size: int = 52, radius: int = 11) -> QPixmap:
+    """Собрать квадратную скруглённую иконку мода из скачанных байтов.
+
+    Вызывать ТОЛЬКО в GUI-потоке (QPixmap/QPainter не потокобезопасны). Поддержку
+    форматов (webp у Modrinth, png/jpg) даёт Qt. Пустой QPixmap — если не распознали.
+    """
+    src = QPixmap()
+    if not data or not src.loadFromData(data):
+        return QPixmap()
+    dpr = 2
+    px = size * dpr
+    src = src.scaled(px, px, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+    if src.width() != px or src.height() != px:  # центр-кроп до квадрата
+        src = src.copy((src.width() - px) // 2, (src.height() - px) // 2, px, px)
+    out = QPixmap(px, px)
+    out.fill(Qt.transparent)
+    p = QPainter(out)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    path = QPainterPath()
+    path.addRoundedRect(QRectF(0, 0, px, px), radius * dpr, radius * dpr)
+    p.setClipPath(path)
+    p.drawPixmap(0, 0, src)
+    p.end()
+    out.setDevicePixelRatio(dpr)
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -448,6 +509,8 @@ class MainWindow(QMainWindow):
         self.back_to = "home"
         self._retrans = []          # хуки локализации
         self._glows = []            # эффекты свечения кнопок (обновляются при смене акцента)
+        self._workers = set()       # живые фоновые задачи — держим ссылку до finished
+        self._icon_cache = {}       # url -> QPixmap (скруглённые иконки модов)
         self.pool = QThreadPool.globalInstance()
         core.apply_proxy(self.cfg)
 
@@ -575,6 +638,16 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, e):
         super().resizeEvent(e)
         self._position_grips()
+
+    def closeEvent(self, e):
+        # Снимаем ещё не стартовавшие фоновые задачи, чтобы не плодить работу на
+        # выходе. Уже запущенные доедут сами — ссылки на них живут в _workers,
+        # а их emit при сносе сигналов погашен (см. Worker._emit).
+        try:
+            self.pool.clear()
+        except Exception:
+            pass
+        super().closeEvent(e)
 
     def _position_grips(self):
         if not hasattr(self, "_grip_br"):
@@ -1262,10 +1335,21 @@ class MainWindow(QMainWindow):
         host = QWidget()
         host.setLayout(results)
         v.addWidget(host)
+
+        # постраничная навигация (1 2 3 … как на сайтах)
+        pager_host = QWidget()
+        pager = QHBoxLayout(pager_host)
+        pager.setContentsMargins(0, 8, 0, 0)
+        pager.setSpacing(7)
+        pager.setAlignment(Qt.AlignCenter)
+        pager_host.setVisible(False)
+        v.addWidget(pager_host)
         v.addStretch(1)
 
         # состояние страницы
-        state = {"source": source, "active_cat": "mod", "target": target, "results": results}
+        state = {"source": source, "active_cat": "mod", "target": target, "results": results,
+                 "pager_host": pager_host, "auto_done": False, "page": 0, "total": 0,
+                 "per_page": 20, "q": "", "loader": None, "mcv": None, "ptype": "mod"}
 
         def refresh_targets():
             cur = target.currentData()
@@ -1283,25 +1367,41 @@ class MainWindow(QMainWindow):
             iid = target.currentData()
             return core.find_instance(self.cfg, iid) if iid else None
 
-        def do_search():
+        def do_search(page=0):
             if self.busy:
                 return
-            inst = target_instance()
-            loader = inst["loader"] if inst else None
-            mcv = inst["mc_version"] if inst else None
-            q = search.text()
-            ptype = state["active_cat"]
+            state["auto_done"] = True   # поиск был — больше не подгружаем популярное само
+            if page == 0:
+                # новый поиск — снимаем параметры, чтобы клики по страницам их не меняли
+                inst = target_instance()
+                state["q"] = search.text()
+                state["loader"] = inst["loader"] if inst else None
+                state["mcv"] = inst["mc_version"] if inst else None
+                state["ptype"] = state["active_cat"]
+            state["page"] = page
+            q, loader, mcv, ptype = state["q"], state["loader"], state["mcv"], state["ptype"]
+            offset = page * state["per_page"]
             if source == "modrinth":
-                self.run_task(core.modrinth_search, q, ptype, loader, mcv,
+                self.run_task(core.modrinth_search, q, ptype, loader, mcv, state["per_page"], offset,
                               busy=self.L("Поиск на Modrinth…", "Searching Modrinth…"),
-                              on_result=lambda hits: show_results(hits, ptype))
+                              on_result=lambda res: show_results(res, ptype))
             else:
                 key = core.cf_key(self.cfg)
-                self.run_task(core.curseforge_search, key, q, ptype, loader, mcv,
+                self.run_task(core.curseforge_search, key, q, ptype, loader, mcv, state["per_page"], offset,
                               busy=self.L("Поиск на CurseForge…", "Searching CurseForge…"),
-                              on_result=lambda data: show_results(data, ptype))
+                              on_result=lambda res: show_results(res, ptype))
 
-        def show_results(items, ptype):
+        def goto_page(p):
+            if self.busy or p == state["page"]:
+                return
+            sc = state.get("scroll")
+            if sc is not None:
+                sc.verticalScrollBar().setValue(0)
+            do_search(p)
+
+        def show_results(res, ptype):
+            items, total = res
+            state["total"] = total
             while results.count():
                 it = results.takeAt(0)
                 if it.widget():
@@ -1311,6 +1411,7 @@ class MainWindow(QMainWindow):
                 empty.setObjectName("muted")
                 results.addWidget(empty)
                 fade_widget(empty, duration=240, start=0.0)
+                render_pager()
                 return
             cards = []
             for it in items:
@@ -1318,9 +1419,72 @@ class MainWindow(QMainWindow):
                 results.addWidget(card)
                 cards.append(card)
             stagger_in(cards, step=40)
+            render_pager()
 
-        go.clicked.connect(do_search)
-        search.returnPressed.connect(do_search)
+        def render_pager():
+            while pager.count():
+                it = pager.takeAt(0)
+                if it.widget():
+                    it.widget().deleteLater()
+            per = state["per_page"]
+            # CurseForge не отдаёт страницы с offset >= 10000 → держим разумный потолок
+            pages = min((state["total"] + per - 1) // per, 50)
+            if pages <= 1:
+                pager_host.setVisible(False)
+                return
+            pager_host.setVisible(True)
+            cur = state["page"]
+
+            def pbtn(label, idx, *, enabled=True, current=False):
+                b = QPushButton(str(label))
+                b.setObjectName("pageCur" if current else "page")
+                b.setEnabled(enabled and not current)
+                if enabled and not current:
+                    b.setCursor(Qt.PointingHandCursor)
+                    b.clicked.connect(lambda _=False, i=idx: goto_page(i))
+                pager.addWidget(b)
+
+            pbtn("‹", cur - 1, enabled=cur > 0)
+            for n in _pager_numbers(cur, pages):
+                if n is None:
+                    gap = QLabel("…")
+                    gap.setObjectName("muted")
+                    pager.addWidget(gap)
+                else:
+                    pbtn(n + 1, n, current=(n == cur))
+            pbtn("›", cur + 1, enabled=cur < pages - 1)
+
+        def show_placeholder(text):
+            while results.count():
+                it = results.takeAt(0)
+                if it.widget():
+                    it.widget().deleteLater()
+            lbl = QLabel(text)
+            lbl.setObjectName("muted")
+            lbl.setWordWrap(True)
+            results.addWidget(lbl)
+            fade_widget(lbl, duration=240, start=0.0)
+
+        def auto_load():
+            """Подгрузить самые популярные моды при заходе на страницу.
+
+            Modrinth — сразу (ключ не нужен). CurseForge — только когда пользователь
+            вписал свой API-ключ в Настройках (бережём квоту встроенного ключа): до
+            этого показываем подсказку, а ручной поиск со встроенным ключом работает.
+            """
+            if state["auto_done"] or self.busy:
+                return
+            if source == "curseforge" and not self.cfg.get("curseforge_api_key", "").strip():
+                show_placeholder(self.L(
+                    "Чтобы здесь сразу появились популярные моды CurseForge, впиши свой "
+                    "API-ключ в Настройках → CurseForge. Поиск работает и без него.",
+                    "To see popular CurseForge mods here, add your API key in "
+                    "Settings → CurseForge. Search works without it too."))
+                return
+            do_search(0)
+
+        go.clicked.connect(lambda: do_search(0))
+        search.returnPressed.connect(lambda: do_search(0))
 
         def on_chip(val):
             state["active_cat"] = val
@@ -1329,8 +1493,11 @@ class MainWindow(QMainWindow):
 
         if not hasattr(self, "browse"):
             self.browse = {}
-        self.browse[source] = {"refresh_targets": refresh_targets}
-        return self._scroll(page)
+        self.browse[source] = {"refresh_targets": refresh_targets,
+                               "auto_load": auto_load, "state": state}
+        sc = self._scroll(page)
+        state["scroll"] = sc          # чтобы при смене страницы прокрутить наверх
+        return sc
 
     def _mod_card(self, source, it, ptype, target_getter):
         if source == "modrinth":
@@ -1338,12 +1505,15 @@ class MainWindow(QMainWindow):
             author = it.get("author", "")
             desc = it.get("description", "")
             downloads = it.get("downloads", 0)
+            icon_url = it.get("icon_url") or ""
         else:
             name = it.get("name", "—")
             authors = it.get("authors") or []
             author = authors[0]["name"] if authors else ""
             desc = it.get("summary", "")
             downloads = it.get("downloadCount", 0)
+            logo = it.get("logo") or {}
+            icon_url = logo.get("url") or logo.get("thumbnailUrl") or ""
 
         card = QFrame()
         card.setObjectName("mod")
@@ -1356,6 +1526,7 @@ class MainWindow(QMainWindow):
         icon.setFixedSize(52, 52)
         icon.setAlignment(Qt.AlignCenter)
         cl.addWidget(icon, 0, Qt.AlignTop)
+        self._load_icon(icon, icon_url)  # настоящий логотип мода (эмодзи — заглушка)
         box = QVBoxLayout()
         box.setSpacing(5)
         top = QLabel(f'{name}  ·  {author}')
@@ -1371,17 +1542,39 @@ class MainWindow(QMainWindow):
         dl.setObjectName("muted")
         foot.addWidget(dl)
         foot.addStretch(1)
-        btn = QPushButton(C.T[self.lang]["install"])
-        btn.setObjectName("install")
-        btn.clicked.connect(lambda _=False: self.install_project(source, it, ptype, target_getter()))
-        self._glow(btn)
-        foot.addWidget(btn)
+        # слот действия: «Установить» либо красная «Удалить», если мод уже в сборке
+        action = QHBoxLayout()
+        foot.addLayout(action)
+
+        def refresh_action():
+            try:
+                while action.count():
+                    w = action.takeAt(0).widget()
+                    if w:
+                        w.deleteLater()
+                entry = core.installed_entry(target_getter(), source, it)
+                if entry:
+                    b = QPushButton("🗑  " + C.T[self.lang]["remove"])
+                    b.setObjectName("remove")
+                    b.clicked.connect(lambda _=False: self.remove_project(
+                        source, it, target_getter(), refresh_action))
+                else:
+                    b = QPushButton(C.T[self.lang]["install"])
+                    b.setObjectName("install")
+                    b.clicked.connect(lambda _=False: self.install_project(
+                        source, it, ptype, target_getter(), refresh_action))
+                self._glow(b)
+                action.addWidget(b)
+            except RuntimeError:
+                pass  # карточку могли удалить новым поиском, пока шла установка
+
+        refresh_action()
         box.addLayout(foot)
         cl.addLayout(box, 1)
         raise_on_hover(card)
         return card
 
-    def install_project(self, source, project, ptype, inst):
+    def install_project(self, source, project, ptype, inst, on_done=None):
         if self.busy:
             return
         if not inst:
@@ -1394,17 +1587,46 @@ class MainWindow(QMainWindow):
         if source == "modrinth":
             self.run_task(core.modrinth_install, inst, project, ptype,
                           busy=self.L(f"Установка {name}…", f"Installing {name}…"),
-                          on_result=lambda e: self.after_install(name))
+                          on_result=lambda e: self.after_install(name, on_done))
         else:
             key = core.cf_key(self.cfg)
             self.run_task(core.curseforge_install, key, inst, project, ptype,
                           busy=self.L(f"Установка {name}…", f"Installing {name}…"),
-                          on_result=lambda e: self.after_install(name))
+                          on_result=lambda e: self.after_install(name, on_done))
 
-    def after_install(self, name):
+    def after_install(self, name, on_done=None):
         core.save_config(self.cfg)
         self.refresh_instances()
         self.toast(self.L(f"Установлено: {name} (с зависимостями)", f"Installed: {name} (with dependencies)"))
+        if on_done:
+            on_done()
+
+    def remove_project(self, source, project, inst, on_done=None):
+        if self.busy:
+            return
+        entry = core.installed_entry(inst, source, project)
+        if not entry:                 # сборку могли переключить — просто обновим кнопку
+            if on_done:
+                on_done()
+            return
+        name = entry.get("name") or project.get("title") or project.get("name") or self.L("мод", "mod")
+        if not self.msg_confirm(
+                self.L("Удалить мод?", "Remove mod?"),
+                self.L(f"Удалить «{name}» из сборки «{inst['name']}»?\n"
+                       "Файл мода будет удалён с диска.",
+                       f"Remove “{name}” from “{inst['name']}”?\n"
+                       "The mod file will be deleted from disk.")):
+            return
+        self.run_task(core.remove_mod, inst, entry,
+                      busy=self.L(f"Удаление {name}…", f"Removing {name}…"),
+                      on_result=lambda _=None: self.after_remove(name, on_done))
+
+    def after_remove(self, name, on_done=None):
+        core.save_config(self.cfg)
+        self.refresh_instances()
+        self.toast(self.L(f"Удалено: {name}", f"Removed: {name}"))
+        if on_done:
+            on_done()
 
     # ============================ СООБЩЕСТВО (заглушка входа) ============================ #
     def _build_community(self):
@@ -1775,6 +1997,8 @@ class MainWindow(QMainWindow):
         if key == "home":
             self.refresh_greeting()
             self.render_news()
+        if key in ("modrinth", "curseforge"):
+            self.browse[key]["auto_load"]()
         self._fade_stack()
 
     def refresh_titlebar(self):
@@ -1809,15 +2033,60 @@ class MainWindow(QMainWindow):
                 "Your local in-game name (for offline launch) is set on the “Play” tab — it is not tied to an account."))
 
     # ============================ ЗАДАЧИ / СТАТУС ============================ #
+    def _launch_worker(self, w, *, on_result=None, on_error=None, on_finished=None):
+        """Запускает Worker, удерживая на него ссылку до сигнала finished.
+
+        Без этого PySide может собрать Worker (и его WorkerSignals) сборщиком мусора,
+        пока поток ещё работает или пока в очереди главного потока висят результаты, —
+        отсюда «Signal source has been deleted» и редкие вылеты. Ссылку снимаем только
+        после finished, когда все результаты уже доставлены.
+        """
+        self._workers.add(w)
+        if on_result:
+            w.signals.result.connect(on_result)
+        if on_error:
+            w.signals.error.connect(on_error)
+
+        def _fin(_w=w):
+            if on_finished:
+                on_finished()
+            self._workers.discard(_w)
+        w.signals.finished.connect(_fin)
+        self.pool.start(w)
+
     def run_task(self, fn, *args, busy="…", on_result=None, **kwargs):
         self.set_busy(True, busy)
         w = Worker(fn, *args, **kwargs)
         w.signals.progress.connect(self.on_progress)
-        if on_result:
-            w.signals.result.connect(on_result)
-        w.signals.error.connect(self.on_error)
-        w.signals.finished.connect(lambda: self.set_busy(False))
-        self.pool.start(w)
+        self._launch_worker(w, on_result=on_result, on_error=self.on_error,
+                            on_finished=lambda: self.set_busy(False))
+
+    def _bg(self, fn, *args, on_result=None):
+        """Лёгкая фоновая задача без индикатора занятости (иконки модов и т.п.)."""
+        self._launch_worker(Worker(fn, *args), on_result=on_result)
+
+    def _load_icon(self, label, url):
+        """Подгрузить иконку мода в QLabel: из кэша мгновенно, иначе — фоном."""
+        if not url:
+            return
+        pm = self._icon_cache.get(url)
+        if pm is not None:
+            if not pm.isNull():
+                label.setText("")
+                label.setPixmap(pm)
+            return
+
+        def done(data, _url=url, _label=label):
+            pm = rounded_icon(data) if data else QPixmap()
+            self._icon_cache[_url] = pm  # кэшируем и неудачу — не долбим CDN повторно
+            if pm.isNull():
+                return
+            try:                       # карточка могла быть удалена новым поиском
+                _label.setText("")
+                _label.setPixmap(pm)
+            except RuntimeError:
+                pass
+        self._bg(core.fetch_bytes, url, on_result=done)
 
     def set_busy(self, flag, text=""):
         self.busy = flag

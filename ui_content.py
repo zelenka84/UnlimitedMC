@@ -12,14 +12,14 @@ DESIGN_VERSION = "v6"
 # короткие строки, которые часто перерисовываются
 T = {
     "ru": {
-        "install": "Установить", "installed": "Установлено ✓",
+        "install": "Установить", "installed": "Установлено ✓", "remove": "Удалить",
         "play": "Играть", "launching": "Запуск…",
         "mods": "модов", "noInstShort": "Сборок пока нет",
         "noInst": "У вас пока нет сборок", "createFirst": "Создать первую сборку",
         "empty": "Здесь пока пусто", "all": "Всё →",
     },
     "en": {
-        "install": "Install", "installed": "Installed ✓",
+        "install": "Install", "installed": "Installed ✓", "remove": "Remove",
         "play": "Play", "launching": "Launching…",
         "mods": "mods", "noInstShort": "No instances yet",
         "noInst": "You have no instances yet", "createFirst": "Create your first instance",
@@ -28,10 +28,10 @@ T = {
 }
 
 GREET = {
-    "ru": ["С возвращением, {n}!", "Рад тебя видеть, {n}", "Погнали, {n}!",
-           "Привет, {n} 👋", "{n}, готов к приключениям?", "Давно не виделись, {n}!"],
+    "ru": ["Добро пожаловать в UnlimitedMC, {n}!","С возвращением, {n}!", "Рад тебя видеть, {n}", "Погнали, {n}!",
+           "Привет, {n} 👋", "{n}, готов к приключениям?", "Давно не виделись, {n}!", "Тсшсйз, хю е тцфхцб тсхугхло еузпв, {n}!", "31062026"],
     "en": ["Welcome back, {n}!", "Good to see you, {n}", "Let’s go, {n}!",
-           "Hey {n} 👋", "Ready for an adventure, {n}?", "Long time no see, {n}!"],
+           "Hey {n} 👋", "Ready for an adventure, {n}?", "Long time no see, {n}!", "I know you wanna play, {n}.", "31062026"],
 }
 
 # новости (group: mc | umc)
