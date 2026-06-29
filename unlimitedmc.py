@@ -625,24 +625,52 @@ class InstanceManagerDialog(QDialog):
 
     # ---------- Контент (моды/паки/шейдеры) ----------
     def _page_content(self):
-        page, self._content_box = self._list_section(
+        page = QWidget()
+        pv = QVBoxLayout(page)
+        pv.setContentsMargins(2, 0, 2, 0)
+        pv.setSpacing(10)
+        intro = QLabel(self.win.L(
             "Моды, ресурспаки и шейдеры — по файлам в папках сборки. Удалить можно любой, даже добавленный вручную.",
-            "Mods, resource packs and shaders found on disk. You can delete any — even ones added manually.")
+            "Mods, resource packs and shaders found on disk. You can delete any — even ones added manually."))
+        intro.setObjectName("muted")
+        intro.setWordWrap(True)
+        pv.addWidget(intro)
+        # чипы-переходы к разделам (Моды / Ресурспаки / Шейдеры)
+        self._content_chips = QHBoxLayout()
+        self._content_chips.setSpacing(8)
+        self._content_chips_host = QWidget()
+        self._content_chips_host.setLayout(self._content_chips)
+        pv.addWidget(self._content_chips_host)
+        box = QVBoxLayout()
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(8)
+        host = QWidget()
+        host.setLayout(box)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(host)
+        pv.addWidget(scroll, 1)
+        self._content_box = box
+        self._content_scroll = scroll
         return page
 
     _TYPE_FALLBACK = {"mod": "content", "resourcepack": "shots", "shader": "worlds"}
 
     def _fill_content(self):
         self._clear(self._content_box)
+        self._clear(self._content_chips)
         self._content_logos = {}
         files = core.instance_mods_on_disk(self.inst)
         if not files:
+            self._content_chips_host.setVisible(False)
             self._empty(self._content_box, "В папках сборки пока нет контента.",
                         "No content in this instance’s folders yet.")
             return
         groups = [("mod", "Моды", "Mods"),
                   ("resourcepack", "Ресурспаки", "Resource packs"),
                   ("shader", "Шейдеры", "Shaders")]
+        headers = {}
         for t, ru, en in groups:
             items = [f for f in files if f["type"] == t]
             if not items:
@@ -650,13 +678,35 @@ class InstanceManagerDialog(QDialog):
             hdr = QLabel(f'{self.win.L(ru, en).upper()} · {len(items)}')
             hdr.setObjectName("seth")
             self._content_box.addWidget(hdr)
+            headers[t] = hdr
             for fobj in items:
                 row, logo = self._content_row(fobj)
                 self._content_logos[fobj["filename"]] = logo
                 self._content_box.addWidget(row)
         self._content_box.addStretch(1)
+        # чипы-переходы к присутствующим разделам (нужны, когда типов больше одного)
+        for t, ru, en in groups:
+            if t not in headers:
+                continue
+            chip = QPushButton(self.win.L(ru, en))
+            chip.setObjectName("chip")
+            chip.setCursor(Qt.PointingHandCursor)
+            chip.clicked.connect(lambda _=False, h=headers[t]: self._scroll_to(h))
+            self._content_chips.addWidget(chip)
+        self._content_chips.addStretch(1)
+        self._content_chips_host.setVisible(len(headers) > 1)
         # настоящие логотипы (в т.ч. опознанные по хэшу для ручных модов) — в фоне
         self.win._instance_icons(self.inst, self._apply_content_logos)
+
+    def _scroll_to(self, header):
+        bar = self._content_scroll.verticalScrollBar()
+        anim = QPropertyAnimation(bar, b"value", self)
+        anim.setDuration(260)
+        anim.setEasingCurve(QEasingCurve.OutCubic)
+        anim.setStartValue(bar.value())
+        anim.setEndValue(max(0, header.y() - 4))
+        anim.start()
+        self._scroll_anim = anim   # держим ссылку, иначе анимацию соберёт GC
 
     def _apply_content_logos(self, m):
         for fn, lab in getattr(self, "_content_logos", {}).items():
