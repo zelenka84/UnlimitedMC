@@ -634,6 +634,7 @@ class InstanceManagerDialog(QDialog):
 
     def _fill_content(self):
         self._clear(self._content_box)
+        self._content_logos = {}
         files = core.instance_mods_on_disk(self.inst)
         if not files:
             self._empty(self._content_box, "В папках сборки пока нет контента.",
@@ -650,19 +651,31 @@ class InstanceManagerDialog(QDialog):
             hdr.setObjectName("seth")
             self._content_box.addWidget(hdr)
             for fobj in items:
-                self._content_box.addWidget(self._content_row(fobj))
+                row, logo = self._content_row(fobj)
+                self._content_logos[fobj["filename"]] = logo
+                self._content_box.addWidget(row)
         self._content_box.addStretch(1)
+        # настоящие логотипы (в т.ч. опознанные по хэшу для ручных модов) — в фоне
+        self.win._instance_icons(self.inst, self._apply_content_logos)
+
+    def _apply_content_logos(self, m):
+        for fn, lab in getattr(self, "_content_logos", {}).items():
+            url = m.get(fn)
+            if url:
+                try:
+                    self.win._load_icon(lab, url, 40, 11)
+                except RuntimeError:
+                    pass
 
     def _content_row(self, f):
         logo = self._logo_label(self._TYPE_FALLBACK.get(f["type"], "content"))
-        self.win._mod_logo(logo, f, size=40, radius=11)   # настоящий логотип, если есть
         if f["source"] == "manual":
             src = self.win.L("добавлен вручную", "added manually")
         else:
             src = self.win.L(f"из лаунчера · {f['source']}", f"from launcher · {f['source']}")
         rm = self._icon_btn("trash", "Удалить", "Remove", "#FF5C7A", danger=True)
         rm.clicked.connect(lambda _=False, ff=f: self._del_content(ff))
-        return self._logo_row(logo, f["name"], f'{src} · {f["filename"]}', [rm])
+        return self._logo_row(logo, f["name"], f'{src} · {f["filename"]}', [rm]), logo
 
     def _del_content(self, f):
         if not self.win.msg_confirm(
@@ -672,6 +685,7 @@ class InstanceManagerDialog(QDialog):
             return
         core.delete_content_file(self.inst, f["filename"], f["subfolder"])
         core.save_config(self.win.cfg)
+        self.win._inst_icon_map.pop(self.inst["id"], None)   # карта логотипов устарела
         self._fill_content()
         self.win.refresh_instances()
 
@@ -966,7 +980,8 @@ class MainWindow(QMainWindow):
         self._glows = []            # эффекты свечения кнопок (обновляются при смене акцента)
         self._workers = set()       # живые фоновые задачи — держим ссылку до finished
         self._icon_cache = {}       # (url,size,radius) -> QPixmap (скруглённые иконки)
-        self._icon_url_cache = {}   # (source,project_id) -> url логотипа (резолв по API)
+        self._inst_icon_map = {}    # id сборки -> {имя_файла: url логотипа} (кэш)
+        self._inst_icon_inflight = {}  # id сборки -> список колбэков, ждущих карту
         self.pool = QThreadPool.globalInstance()
         core.apply_proxy(self.cfg)
 
@@ -1592,7 +1607,7 @@ class MainWindow(QMainWindow):
         thumb.setFixedHeight(96)
         entries = core.instance_icon_entries(inst, 5)
         if entries:
-            self._build_collage(thumb, entries)
+            self._build_collage(thumb, inst, entries)
         else:
             tl = QVBoxLayout(thumb)
             ph = QLabel()
@@ -1634,23 +1649,37 @@ class MainWindow(QMainWindow):
         raise_on_hover(card)
         return card
 
-    def _build_collage(self, thumb, entries):
+    def _build_collage(self, thumb, inst, entries):
         """Коллаж из 3–5 логотипов модов на превью: скруглённые плитки веером по
-        центру. Логотипы подгружаются в фоне, до загрузки плитка-фон как placeholder."""
+        центру. До загрузки логотипов — векторная заглушка; логотипы (включая
+        опознанные по хэшу для ручных модов) подставляются в фоне по имени файла."""
         n = len(entries)
         tile = 60
         step = 0 if n == 1 else min(46, (210 - tile) // (n - 1))
         total = tile + (n - 1) * step
         x0 = max(8, (226 - total) // 2)
         y = (96 - tile) // 2
+        fb = ui_icon("content", THEMES[self.theme]["muted"], 26).pixmap(QSize(26, 26))
+        tiles = {}
         for i, e in enumerate(entries):
             t = QLabel(thumb)
             t.setObjectName("collageTile")
             t.setFixedSize(tile, tile)
             t.move(x0 + i * step, y)
             t.setAlignment(Qt.AlignCenter)
+            t.setPixmap(fb)
             t.raise_()
-            self._mod_logo(t, e, size=tile - 8, radius=16)
+            tiles[e["filename"]] = t
+
+        def apply(m, _tiles=tiles):
+            for fn, lab in _tiles.items():
+                url = m.get(fn)
+                if url:
+                    try:
+                        self._load_icon(lab, url, tile - 8, 16)
+                    except RuntimeError:
+                        pass
+        self._instance_icons(inst, apply)
 
     def refresh_instances(self):
         if hasattr(self, "inst_flow"):
@@ -2082,6 +2111,7 @@ class MainWindow(QMainWindow):
 
     def after_install(self, name, on_done=None):
         core.save_config(self.cfg)
+        self._inst_icon_map.clear()   # состав модов изменился — пересоберём карту логотипов
         self.refresh_instances()
         self.toast(self.L(f"Установлено: {name} (с зависимостями)", f"Installed: {name} (with dependencies)"))
         if on_done:
@@ -2109,6 +2139,7 @@ class MainWindow(QMainWindow):
 
     def after_remove(self, name, on_done=None):
         core.save_config(self.cfg)
+        self._inst_icon_map.clear()
         self.refresh_instances()
         self.toast(self.L(f"Удалено: {name}", f"Removed: {name}"))
         if on_done:
@@ -2575,29 +2606,30 @@ class MainWindow(QMainWindow):
                 pass
         self._bg(core.fetch_bytes, url, on_result=done)
 
-    def _mod_logo(self, label, entry, size=44, radius=12):
-        """Поставить в label настоящий логотип мода. Если URL не сохранён в записи —
-        достаём его по API в фоне (и кэшируем на сессию). Без источника — оставляем
-        запасную иконку, которую вызывающий уже нарисовал."""
-        url = entry.get("icon")
-        if url:
-            self._load_icon(label, url, size, radius)
-            return
-        src, pid = entry.get("source"), entry.get("project_id")
-        if not src or pid is None or src == "manual":
-            return
-        cached = self._icon_url_cache.get((src, pid))
-        if cached is not None:
-            if cached:
-                self._load_icon(label, cached, size, radius)
-            return
+    def _instance_icons(self, inst, on_ready):
+        """Карта {имя_файла: url логотипа} для сборки — в фоне, с кэшем и дедупом.
 
-        def got(u, _key=(src, pid), _label=label, _entry=entry, _s=size, _r=radius):
-            self._icon_url_cache[_key] = u or ""
-            if u:
-                _entry["icon"] = u           # бэкфилл в памяти на эту сессию
-                self._load_icon(_label, u, _s, _r)
-        self._bg(core.mod_icon_url, src, pid, core.cf_key(self.cfg), on_result=got)
+        Логотипы берутся из записей лаунчера, а для файлов без записи (добавленных
+        вручную) — опознаются по SHA1 через Modrinth. Колбэк зовётся в GUI-потоке.
+        """
+        iid = inst.get("id")
+        cached = self._inst_icon_map.get(iid)
+        if cached is not None:
+            on_ready(cached)
+            return
+        waiters = self._inst_icon_inflight.setdefault(iid, [])
+        waiters.append(on_ready)
+        if len(waiters) > 1:
+            return  # карта уже грузится — подождём общий результат
+
+        def done(m, _iid=iid):
+            self._inst_icon_map[_iid] = m or {}
+            for cb in self._inst_icon_inflight.pop(_iid, []):
+                try:
+                    cb(self._inst_icon_map[_iid])
+                except RuntimeError:
+                    pass
+        self._bg(core.instance_icon_map, inst, on_result=done)
 
     def set_busy(self, flag, text=""):
         self.busy = flag

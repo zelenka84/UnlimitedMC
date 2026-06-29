@@ -361,40 +361,84 @@ def instance_mods_on_disk(inst: dict) -> list[dict]:
 
 
 def instance_icon_entries(inst: dict, limit: int = 5) -> list[dict]:
-    """До `limit` записей модов с источником — для коллажа логотипов на превью.
-
-    Сначала свои моды, затем зависимости. Порядок стабильно-случайный (seed = id
-    сборки): на одной сборке набор не «прыгает» при каждой перерисовке, но между
-    сборками выглядит по-разному.
-    """
-    mods = [m for m in inst.get("mods", []) if m.get("source") and m.get("project_id")]
-    primary = [m for m in mods if not m.get("dep")]
-    deps = [m for m in mods if m.get("dep")]
+    """До `limit` файлов сборки для коллажа логотипов — по файлам на диске
+    (моды раньше паков/шейдеров). Стабильно-случайный порядок (seed = id сборки)."""
+    files = instance_mods_on_disk(inst)
+    mods = [f for f in files if f["type"] == "mod"]
+    others = [f for f in files if f["type"] != "mod"]
     rnd = random.Random(str(inst.get("id", "")))
-    rnd.shuffle(primary)
-    rnd.shuffle(deps)
-    return (primary + deps)[:limit]
+    rnd.shuffle(mods)
+    rnd.shuffle(others)
+    return (mods + others)[:limit]
 
 
-def mod_icon_url(source: str, project_id, cf_key: str = "") -> str | None:
-    """URL логотипа мода/паков по источнику и id (когда он не сохранён в записи).
+def file_sha1(path) -> str:
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
-    Сетевой вызов: дёргать в фоне. Любая ошибка → None (превью просто без иконки).
-    """
+
+def modrinth_files_by_hashes(hashes: list[str]) -> dict:
+    """Опознать файлы по SHA1 через Modrinth: {sha1: version}. Пусто при ошибке."""
+    if not hashes:
+        return {}
     try:
-        if source == "modrinth":
-            r = _session.get(f"{M_BASE}/project/{project_id}", timeout=15)
-            r.raise_for_status()
-            return r.json().get("icon_url") or None
-        if source == "curseforge":
-            key = cf_key or _bundled_key()
-            if not key:
-                return None
-            r = _cf_get(f"{CF_BASE}/mods/{project_id}", key)
-            return ((r.json().get("data") or {}).get("logo") or {}).get("url") or None
+        r = _session.post(f"{M_BASE}/version_files",
+                          json={"hashes": hashes, "algorithm": "sha1"}, timeout=20)
+        r.raise_for_status()
+        return r.json()
     except Exception:
-        return None
-    return None
+        return {}
+
+
+def modrinth_projects(ids: list) -> dict:
+    """Несколько проектов Modrinth разом: {id: project}. Пусто при ошибке."""
+    if not ids:
+        return {}
+    try:
+        r = _session.get(f"{M_BASE}/projects", params={"ids": json.dumps(ids)}, timeout=20)
+        r.raise_for_status()
+        return {p["id"]: p for p in r.json()}
+    except Exception:
+        return {}
+
+
+def instance_icon_map(inst: dict) -> dict:
+    """{имя_файла: url_логотипа} для контента сборки.
+
+    Сначала логотипы из записей лаунчера; остальные файлы (включая добавленные
+    вручную) опознаём по SHA1 через Modrinth — всего два запроса на сборку.
+    Сетевой вызов: запускать в фоне.
+    """
+    result = {}
+    for m in inst.get("mods", []):
+        if m.get("filename") and m.get("icon"):
+            result[m["filename"]] = m["icon"]
+    base = instance_dir(inst)
+    need = {}  # sha1 -> filename
+    for sub in CONTENT_FOLDERS:
+        folder = base / sub
+        if not folder.exists():
+            continue
+        for p in folder.iterdir():
+            if not p.is_file() or p.name in result:
+                continue
+            try:
+                need[file_sha1(p)] = p.name
+            except OSError:
+                continue
+    if need:
+        versions = modrinth_files_by_hashes(list(need.keys()))
+        proj_of = {h: v.get("project_id") for h, v in versions.items()
+                   if isinstance(v, dict) and v.get("project_id")}
+        projects = modrinth_projects(list(set(proj_of.values())))
+        for h, fn in need.items():
+            proj = projects.get(proj_of.get(h))
+            if proj and proj.get("icon_url"):
+                result[fn] = proj["icon_url"]
+    return result
 
 
 def delete_content_file(inst: dict, filename: str, subfolder: str) -> None:
