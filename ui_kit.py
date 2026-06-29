@@ -695,6 +695,9 @@ QPushButton#mgrNav:hover {{ color:{text}; background:{surface}; }}
 QPushButton#mgrNav:checked {{ background:{accent_soft}; color:{text}; }}
 QFrame#shot {{ background:{surface}; border:1px solid {border}; border-radius:10px; }}
 QFrame#shot:hover {{ border:1px solid {border_strong}; }}
+QLabel#collageTile {{ background:{surface2}; border:1px solid {border_strong}; border-radius:18px; }}
+QLabel#rowLogo {{ background:{accent_soft2}; border-radius:11px; }}
+QFrame#vsep {{ background:{border}; }}
 QPushButton#chip {{ background:{surface}; border:1px solid {border}; border-radius:999px;
     padding:8px 15px; color:{muted}; font-weight:500; }}
 QPushButton#chip:hover {{ color:{text}; }}

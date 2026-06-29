@@ -12,6 +12,7 @@ import json
 import uuid
 import base64
 import struct
+import random
 import shutil
 import hashlib
 import zipfile
@@ -353,8 +354,47 @@ def instance_mods_on_disk(inst: dict) -> list[dict]:
                 "type": ptype,
                 "name": meta.get("name") or p.name,
                 "source": meta.get("source") or "manual",
+                "project_id": meta.get("project_id"),
+                "icon": meta.get("icon"),
             })
     return out
+
+
+def instance_icon_entries(inst: dict, limit: int = 5) -> list[dict]:
+    """До `limit` записей модов с источником — для коллажа логотипов на превью.
+
+    Сначала свои моды, затем зависимости. Порядок стабильно-случайный (seed = id
+    сборки): на одной сборке набор не «прыгает» при каждой перерисовке, но между
+    сборками выглядит по-разному.
+    """
+    mods = [m for m in inst.get("mods", []) if m.get("source") and m.get("project_id")]
+    primary = [m for m in mods if not m.get("dep")]
+    deps = [m for m in mods if m.get("dep")]
+    rnd = random.Random(str(inst.get("id", "")))
+    rnd.shuffle(primary)
+    rnd.shuffle(deps)
+    return (primary + deps)[:limit]
+
+
+def mod_icon_url(source: str, project_id, cf_key: str = "") -> str | None:
+    """URL логотипа мода/паков по источнику и id (когда он не сохранён в записи).
+
+    Сетевой вызов: дёргать в фоне. Любая ошибка → None (превью просто без иконки).
+    """
+    try:
+        if source == "modrinth":
+            r = _session.get(f"{M_BASE}/project/{project_id}", timeout=15)
+            r.raise_for_status()
+            return r.json().get("icon_url") or None
+        if source == "curseforge":
+            key = cf_key or _bundled_key()
+            if not key:
+                return None
+            r = _cf_get(f"{CF_BASE}/mods/{project_id}", key)
+            return ((r.json().get("data") or {}).get("logo") or {}).get("url") or None
+    except Exception:
+        return None
+    return None
 
 
 def delete_content_file(inst: dict, filename: str, subfolder: str) -> None:
@@ -647,7 +687,8 @@ def modrinth_install(inst: dict, project: dict, project_type: str, progress_cb,
         folder = instance_dir(inst) / _content_subfolder(project_type)
         download_file(file["url"], folder / file["filename"], progress_cb)
         entry = {"source": "modrinth", "project_id": pid, "name": title,
-                 "filename": file["filename"], "type": project_type, "dep": _is_dep}
+                 "filename": file["filename"], "type": project_type, "dep": _is_dep,
+                 "icon": project.get("icon_url")}
         inst.setdefault("mods", []).append(entry)
 
     # обязательные зависимости
@@ -784,6 +825,7 @@ def curseforge_install(key: str, inst: dict, project: dict, project_type: str, p
     folder = instance_dir(inst) / _content_subfolder(project_type)
     download_file(file["downloadUrl"], folder / file["fileName"], progress_cb)
     entry = {"source": "curseforge", "project_id": mod_id, "name": project.get("name") or file["fileName"],
-             "filename": file["fileName"], "type": project_type, "dep": False}
+             "filename": file["fileName"], "type": project_type, "dep": False,
+             "icon": (project.get("logo") or {}).get("url")}
     inst.setdefault("mods", []).append(entry)
     return entry

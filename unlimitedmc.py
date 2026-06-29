@@ -424,10 +424,17 @@ class InstanceManagerDialog(QDialog):
         v.setSpacing(14)
 
         head = QHBoxLayout()
-        title = QLabel(win.L(f"Сборка — {inst['name']}", f"Instance — {inst['name']}"))
+        htext = QVBoxLayout()
+        htext.setSpacing(2)
+        title = QLabel(inst["name"])
         title.setObjectName("msgTitle")
         title.setWordWrap(True)
-        head.addWidget(title, 1)
+        n = core.count_instance_mods(inst)
+        subt = QLabel(f'{inst["loader"]} · {inst["mc_version"]} · {n} {C.T[win.lang]["mods"]}')
+        subt.setObjectName("muted")
+        htext.addWidget(title)
+        htext.addWidget(subt)
+        head.addLayout(htext, 1)
         close = QPushButton(win.L("Закрыть", "Close"))
         close.setObjectName("ghost")
         close.clicked.connect(self.accept)
@@ -465,8 +472,12 @@ class InstanceManagerDialog(QDialog):
         nav.addStretch(1)
         nav_host = QWidget()
         nav_host.setLayout(nav)
-        nav_host.setFixedWidth(190)
+        nav_host.setFixedWidth(186)
         body.addWidget(nav_host, 0)
+        sep = QFrame()
+        sep.setObjectName("vsep")
+        sep.setFixedWidth(1)
+        body.addWidget(sep)
         body.addWidget(self.stack, 1)
         v.addLayout(body, 1)
 
@@ -477,10 +488,14 @@ class InstanceManagerDialog(QDialog):
         self._fill_shots()
 
     # ---------- мелкие помощники ----------
-    def _ic(self, key, color=None, size=18):
+    def _logo_label(self, icon_key=None):
+        """Скруглённая плитка-логотип 40×40 (с запасной векторной иконкой)."""
         lab = QLabel()
-        lab.setPixmap(ui_icon(key, color or self.c_muted, size).pixmap(QSize(size, size)))
-        lab.setStyleSheet("background:transparent;")
+        lab.setObjectName("rowLogo")
+        lab.setFixedSize(40, 40)
+        lab.setAlignment(Qt.AlignCenter)
+        if icon_key:
+            lab.setPixmap(ui_icon(icon_key, self.c_muted, 20).pixmap(QSize(20, 20)))
         return lab
 
     def _icon_btn(self, key, ru, en, color, *, danger=False, primary=False):
@@ -531,12 +546,15 @@ class InstanceManagerDialog(QDialog):
         box.addWidget(lab)
 
     def _row(self, icon_key, title, subtitle, buttons):
+        return self._logo_row(self._logo_label(icon_key), title, subtitle, buttons)
+
+    def _logo_row(self, logo, title, subtitle, buttons):
         row = QFrame()
         row.setObjectName("inst")
         rl = QHBoxLayout(row)
         rl.setContentsMargins(13, 10, 13, 10)
-        rl.setSpacing(11)
-        rl.addWidget(self._ic(icon_key), 0, Qt.AlignVCenter)
+        rl.setSpacing(12)
+        rl.addWidget(logo, 0, Qt.AlignVCenter)
         box = QVBoxLayout()
         box.setSpacing(2)
         nm = QLabel(title)
@@ -612,24 +630,39 @@ class InstanceManagerDialog(QDialog):
             "Mods, resource packs and shaders found on disk. You can delete any — even ones added manually.")
         return page
 
+    _TYPE_FALLBACK = {"mod": "content", "resourcepack": "shots", "shader": "worlds"}
+
     def _fill_content(self):
         self._clear(self._content_box)
         files = core.instance_mods_on_disk(self.inst)
         if not files:
-            self._empty(self._content_box, "В папках сборки пока нет модов.",
+            self._empty(self._content_box, "В папках сборки пока нет контента.",
                         "No content in this instance’s folders yet.")
             return
-        ikey = {"mod": "content", "resourcepack": "shots", "shader": "worlds"}
-        for fobj in files:
-            if fobj["source"] == "manual":
-                src = self.win.L("добавлен вручную", "added manually")
-            else:
-                src = self.win.L(f"из лаунчера · {fobj['source']}", f"from launcher · {fobj['source']}")
-            rm = self._icon_btn("trash", "Удалить", "Remove", "#FF5C7A", danger=True)
-            rm.clicked.connect(lambda _=False, ff=fobj: self._del_content(ff))
-            self._content_box.addWidget(self._row(
-                ikey.get(fobj["type"], "content"), fobj["name"], f'{src} · {fobj["filename"]}', [rm]))
+        groups = [("mod", "Моды", "Mods"),
+                  ("resourcepack", "Ресурспаки", "Resource packs"),
+                  ("shader", "Шейдеры", "Shaders")]
+        for t, ru, en in groups:
+            items = [f for f in files if f["type"] == t]
+            if not items:
+                continue
+            hdr = QLabel(f'{self.win.L(ru, en).upper()} · {len(items)}')
+            hdr.setObjectName("seth")
+            self._content_box.addWidget(hdr)
+            for fobj in items:
+                self._content_box.addWidget(self._content_row(fobj))
         self._content_box.addStretch(1)
+
+    def _content_row(self, f):
+        logo = self._logo_label(self._TYPE_FALLBACK.get(f["type"], "content"))
+        self.win._mod_logo(logo, f, size=40, radius=11)   # настоящий логотип, если есть
+        if f["source"] == "manual":
+            src = self.win.L("добавлен вручную", "added manually")
+        else:
+            src = self.win.L(f"из лаунчера · {f['source']}", f"from launcher · {f['source']}")
+        rm = self._icon_btn("trash", "Удалить", "Remove", "#FF5C7A", danger=True)
+        rm.clicked.connect(lambda _=False, ff=f: self._del_content(ff))
+        return self._logo_row(logo, f["name"], f'{src} · {f["filename"]}', [rm])
 
     def _del_content(self, f):
         if not self.win.msg_confirm(
@@ -932,7 +965,8 @@ class MainWindow(QMainWindow):
         self._retrans = []          # хуки локализации
         self._glows = []            # эффекты свечения кнопок (обновляются при смене акцента)
         self._workers = set()       # живые фоновые задачи — держим ссылку до finished
-        self._icon_cache = {}       # url -> QPixmap (скруглённые иконки модов)
+        self._icon_cache = {}       # (url,size,radius) -> QPixmap (скруглённые иконки)
+        self._icon_url_cache = {}   # (source,project_id) -> url логотипа (резолв по API)
         self.pool = QThreadPool.globalInstance()
         core.apply_proxy(self.cfg)
 
@@ -1556,11 +1590,16 @@ class MainWindow(QMainWindow):
         thumb = QFrame()
         thumb.setObjectName("instThumb")
         thumb.setFixedHeight(96)
-        tl = QVBoxLayout(thumb)
-        emo = QLabel(C.LOADER_EMOJI.get(inst["loader"], "📦"))
-        emo.setAlignment(Qt.AlignCenter)
-        emo.setStyleSheet("font-size:30px;background:transparent;")
-        tl.addWidget(emo)
+        entries = core.instance_icon_entries(inst, 5)
+        if entries:
+            self._build_collage(thumb, entries)
+        else:
+            tl = QVBoxLayout(thumb)
+            ph = QLabel()
+            ph.setAlignment(Qt.AlignCenter)
+            ph.setPixmap(ui_icon("content", THEMES[self.theme]["muted"], 30).pixmap(QSize(30, 30)))
+            ph.setStyleSheet("background:transparent;")
+            tl.addWidget(ph)
         cv.addWidget(thumb)
         body = QVBoxLayout()
         body.setContentsMargins(14, 12, 14, 14)
@@ -1594,6 +1633,24 @@ class MainWindow(QMainWindow):
         cv.addWidget(bw)
         raise_on_hover(card)
         return card
+
+    def _build_collage(self, thumb, entries):
+        """Коллаж из 3–5 логотипов модов на превью: скруглённые плитки веером по
+        центру. Логотипы подгружаются в фоне, до загрузки плитка-фон как placeholder."""
+        n = len(entries)
+        tile = 60
+        step = 0 if n == 1 else min(46, (210 - tile) // (n - 1))
+        total = tile + (n - 1) * step
+        x0 = max(8, (226 - total) // 2)
+        y = (96 - tile) // 2
+        for i, e in enumerate(entries):
+            t = QLabel(thumb)
+            t.setObjectName("collageTile")
+            t.setFixedSize(tile, tile)
+            t.move(x0 + i * step, y)
+            t.setAlignment(Qt.AlignCenter)
+            t.raise_()
+            self._mod_logo(t, e, size=tile - 8, radius=16)
 
     def refresh_instances(self):
         if hasattr(self, "inst_flow"):
@@ -2494,20 +2551,21 @@ class MainWindow(QMainWindow):
         """Лёгкая фоновая задача без индикатора занятости (иконки модов и т.п.)."""
         self._launch_worker(Worker(fn, *args), on_result=on_result)
 
-    def _load_icon(self, label, url):
-        """Подгрузить иконку мода в QLabel: из кэша мгновенно, иначе — фоном."""
+    def _load_icon(self, label, url, size=52, radius=11):
+        """Подгрузить иконку в QLabel: из кэша мгновенно, иначе — фоном."""
         if not url:
             return
-        pm = self._icon_cache.get(url)
+        ck = (url, size, radius)
+        pm = self._icon_cache.get(ck)
         if pm is not None:
             if not pm.isNull():
                 label.setText("")
                 label.setPixmap(pm)
             return
 
-        def done(data, _url=url, _label=label):
-            pm = rounded_icon(data) if data else QPixmap()
-            self._icon_cache[_url] = pm  # кэшируем и неудачу — не долбим CDN повторно
+        def done(data, _ck=ck, _label=label, _s=size, _r=radius):
+            pm = rounded_icon(data, _s, _r) if data else QPixmap()
+            self._icon_cache[_ck] = pm  # кэшируем и неудачу — не долбим CDN повторно
             if pm.isNull():
                 return
             try:                       # карточка могла быть удалена новым поиском
@@ -2516,6 +2574,30 @@ class MainWindow(QMainWindow):
             except RuntimeError:
                 pass
         self._bg(core.fetch_bytes, url, on_result=done)
+
+    def _mod_logo(self, label, entry, size=44, radius=12):
+        """Поставить в label настоящий логотип мода. Если URL не сохранён в записи —
+        достаём его по API в фоне (и кэшируем на сессию). Без источника — оставляем
+        запасную иконку, которую вызывающий уже нарисовал."""
+        url = entry.get("icon")
+        if url:
+            self._load_icon(label, url, size, radius)
+            return
+        src, pid = entry.get("source"), entry.get("project_id")
+        if not src or pid is None or src == "manual":
+            return
+        cached = self._icon_url_cache.get((src, pid))
+        if cached is not None:
+            if cached:
+                self._load_icon(label, cached, size, radius)
+            return
+
+        def got(u, _key=(src, pid), _label=label, _entry=entry, _s=size, _r=radius):
+            self._icon_url_cache[_key] = u or ""
+            if u:
+                _entry["icon"] = u           # бэкфилл в памяти на эту сессию
+                self._load_icon(_label, u, _s, _r)
+        self._bg(core.mod_icon_url, src, pid, core.cf_key(self.cfg), on_result=got)
 
     def set_busy(self, flag, text=""):
         self.busy = flag
