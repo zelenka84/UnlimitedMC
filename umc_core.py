@@ -775,7 +775,7 @@ CF_LOADER = {"forge": 1, "fabric": 4, "quilt": 5, "neoforge": 6}
 # Сменить ключ:  python tools/obfuscate_cf_key.py  → вставить новую строку ниже.
 # Приоритет: личный ключ пользователя из Настроек важнее встроенного.
 _VEIL = b"UnlimitedMC::cf::v1"
-CF_BUNDLED_KEY_OBF = "NggPNh0IADoCKXsJCAFWDgoXAmFcVVBdC0ZTVixwXgtbVA4IFAJkV15bDwsSAQd+c1sLVlIDXkcIN1peUVxfQ1ZTencDWVYA"
+CF_BUNDLED_KEY_OBF = "not_today_bruh"
 
 
 def _bundled_key() -> str:
