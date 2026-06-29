@@ -36,7 +36,7 @@ import umc_core as core
 import ui_content as C
 from ui_kit import (
     Logo, Ambient, Clickable, Toggle, FlowLayout, build_qss, nav_icon, win_icon, ui_icon,
-    fade_widget, stagger_in, raise_on_hover, glow_on_hover,
+    app_icon, fade_widget, stagger_in, raise_on_hover, glow_on_hover,
     THEMES, ACCENTS, SOURCE_ACCENT,
 )
 
@@ -2716,8 +2716,17 @@ class MainWindow(QMainWindow):
 #  Точка входа
 # --------------------------------------------------------------------------- #
 def main():
+    # Windows: свой AppUserModelID, иначе панель задач берёт иконку python, а не нашу
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("UnlimitedMC.Launcher")
+        except Exception:  # noqa: BLE001
+            pass
+
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
+    app.setWindowIcon(app_icon())   # логотип в панели задач и в окне
 
     win = MainWindow()
 

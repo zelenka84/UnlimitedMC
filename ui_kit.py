@@ -373,6 +373,36 @@ def ui_icon(key: str, color: str, size: int = 16) -> QIcon:
 
 
 # --------------------------------------------------------------------------- #
+#  Иконка приложения (таскбар / окно / .exe) — знак-логотип на тёмной плитке
+# --------------------------------------------------------------------------- #
+def icon_pixmap(size: int, accent: str = "#4C8DFF") -> QPixmap:
+    """Квадратная иконка приложения нужного размера: тёмный скруглённый фон +
+    знак-логотип по центру. Используется и для окна, и для генерации .ico."""
+    pm = QPixmap(size, size)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor("#10131C"))
+    r = size * 0.22
+    p.drawRoundedRect(0, 0, size, size, r, r)
+    inner = size * 0.62
+    off = (size - inner) / 2
+    QSvgRenderer(QByteArray(logo_svg(accent).encode("utf-8"))).render(
+        p, QRectF(off, off, inner, inner))
+    p.end()
+    return pm
+
+
+def app_icon(accent: str = "#4C8DFF") -> QIcon:
+    """QIcon с набором размеров — для `setWindowIcon` (иконка в панели задач)."""
+    ic = QIcon()
+    for s in (16, 24, 32, 48, 64, 128, 256):
+        ic.addPixmap(icon_pixmap(s, accent))
+    return ic
+
+
+# --------------------------------------------------------------------------- #
 #  Логотип-виджет (перерисовывается при смене акцента)
 # --------------------------------------------------------------------------- #
 class Logo(QSvgWidget):

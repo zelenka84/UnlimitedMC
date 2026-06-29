@@ -5,6 +5,10 @@ __pycache__/
 build/
 dist/
 
+# Сборка .exe (PyInstaller)
+*.spec
+assets/icon_preview.png
+
 # Виртуальные окружения
 .venv/
 venv/
