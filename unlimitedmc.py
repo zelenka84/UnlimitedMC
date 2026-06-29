@@ -1200,8 +1200,8 @@ class MainWindow(QMainWindow):
         self.browse_label = QLabel()
         self.browse_label.setObjectName("sideLabel")
         self.nav_meta2 = [
-            ("modrinth", "Modrinth", "Modrinth", "Моды, паки, шейдеры и сборки", "Mods, packs, shaders and modpacks", True),
-            ("curseforge", "CurseForge", "CurseForge", "Моды, паки, шейдеры и сборки", "Mods, packs, shaders and modpacks", True),
+            ("modrinth", "Modrinth", "Modrinth", "Моды, паки и шейдеры", "Mods, packs and shaders", True),
+            ("curseforge", "CurseForge", "CurseForge", "Моды, паки и шейдеры", "Mods, packs and shaders", True),
             ("settings", "Настройки", "Settings", "Профиль, оформление и поведение", "Profile, appearance and behavior", False),
         ]
         self.nav_btns = {}

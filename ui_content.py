@@ -66,11 +66,11 @@ NEWS = [
     {"id": "content", "group": "umc", "cover": "✨",
      "tag": "v0.3", "tagEn": "v0.3", "date": "10 июня", "dateEn": "June 10",
      "title": "Modrinth и CurseForge", "titleEn": "Modrinth and CurseForge",
-     "sum": "Моды, шейдеры и сборки теперь ставятся прямо из лаунчера.",
-     "sumEn": "Mods, shaders and packs now install right from the launcher.",
-     "body": ["Теперь моды, шейдеры, ресурспаки и сборки можно искать и устанавливать прямо в UnlimitedMC — в один клик, в нужную сборку.",
+     "sum": "Моды, шейдеры и ресурспаки теперь ставятся прямо из лаунчера.",
+     "sumEn": "Mods, shaders and resource packs now install right from the launcher.",
+     "body": ["Теперь моды, шейдеры и ресурспаки можно искать и устанавливать прямо в UnlimitedMC — в один клик, в нужную сборку.",
               "Поддерживаются оба крупнейших каталога: Modrinth и CurseForge. Больше не нужно качать файлы вручную и раскидывать их по папкам."],
-     "bodyEn": ["You can now search and install mods, shaders, resource packs and modpacks right inside UnlimitedMC — one click into the instance you choose.",
+     "bodyEn": ["You can now search and install mods, shaders and resource packs right inside UnlimitedMC — one click into the instance you choose.",
                 "Both major catalogs are supported: Modrinth and CurseForge. No more downloading files by hand and sorting them into folders."]},
     {"id": "profiles", "group": "umc", "cover": "🎨",
      "tag": "Кастомизация", "tagEn": "Customization", "date": "7 июня", "dateEn": "June 7",
@@ -92,7 +92,7 @@ NEWS = [
                 "Next up: speeding up mod installation itself."]},
 ]
 
-TYPES = [("Моды", "Mods", "mod"), ("Сборки", "Modpacks", "modpack"),
+TYPES = [("Моды", "Mods", "mod"),
          ("Ресурспаки", "Resource Packs", "resourcepack"), ("Шейдеры", "Shaders", "shader")]
 LOADERS = ["vanilla", "fabric", "forge", "quilt"]
 COMMON_VERSIONS = ["1.21.4", "1.21.1", "1.20.6", "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2"]
