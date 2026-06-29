@@ -195,7 +195,15 @@ def get_release_versions(limit: int = 80) -> list[str]:
     return out
 
 
-def install_for_instance(inst: dict, progress_cb) -> str:
+def _installer_java(cfg: dict | None = None) -> str:
+    """Java для запуска установщика загрузчика (NeoForge). Личный путь из Настроек,
+    иначе системная java из PATH."""
+    if cfg and (cfg.get("java_path") or "").strip():
+        return cfg["java_path"].strip()
+    return shutil.which("java") or shutil.which("javaw") or "java"
+
+
+def install_for_instance(inst: dict, progress_cb, cfg: dict | None = None) -> str:
     mc = inst["mc_version"]
     loader = (inst.get("loader") or "vanilla").lower()
     before = installed_version_ids()
@@ -215,6 +223,16 @@ def install_for_instance(inst: dict, progress_cb) -> str:
         if hasattr(mll.forge, "supports_automatic_install") and not mll.forge.supports_automatic_install(fv):
             raise RuntimeError(f"Forge {fv} нельзя установить автоматически")
         mll.forge.install_forge_version(fv, str(SHARED_MC), callback=_callback(progress_cb))
+    elif loader == "neoforge":
+        ld = mll.mod_loader.get_mod_loader("neoforge")
+        versions = ld.get_loader_versions(mc, stable_only=True)
+        if not versions:
+            raise RuntimeError(f"NeoForge не поддерживает версию {mc} (доступен с 1.20.2)")
+        # install сам возвращает id версии для запуска (без эвристики ниже)
+        inst["launch_id"] = ld.install(
+            mc, str(SHARED_MC), loader_version=versions[0],
+            callback=_callback(progress_cb), java=_installer_java(cfg))
+        return inst["launch_id"]
     else:
         raise RuntimeError(f"Загрузчик «{loader}» пока не поддерживается")
 
@@ -256,7 +274,7 @@ def build_command(inst: dict, cfg: dict) -> list[str]:
 def ensure_and_launch(inst: dict, cfg: dict, progress_cb):
     launch_id = inst.get("launch_id")
     if not launch_id or launch_id not in installed_version_ids():
-        install_for_instance(inst, progress_cb)
+        install_for_instance(inst, progress_cb, cfg)
     progress_cb("Запуск игры…", 0, 0)
     cmd = build_command(inst, cfg)
     return subprocess.Popen(cmd, cwd=str(instance_dir(inst)))

@@ -359,7 +359,7 @@ class CreateInstanceDialog(QDialog):
         self.version.setEditable(True)
         self.version.addItems(C.COMMON_VERSIONS)
         self.loader = QComboBox()
-        self.loader.addItems([l.capitalize() for l in C.LOADERS])
+        self.loader.addItems([C.LOADER_NAMES.get(l, l.capitalize()) for l in C.LOADERS])
 
         form.addRow(win.L("Название", "Name"), self.name)
         form.addRow(win.L("Версия", "Version"), self.version)

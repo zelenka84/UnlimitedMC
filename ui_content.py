@@ -94,7 +94,9 @@ NEWS = [
 
 TYPES = [("Моды", "Mods", "mod"),
          ("Ресурспаки", "Resource Packs", "resourcepack"), ("Шейдеры", "Shaders", "shader")]
-LOADERS = ["vanilla", "fabric", "forge", "quilt"]
+LOADERS = ["vanilla", "fabric", "forge", "quilt", "neoforge"]
+LOADER_NAMES = {"vanilla": "Vanilla", "fabric": "Fabric", "forge": "Forge",
+                "quilt": "Quilt", "neoforge": "NeoForge"}
 COMMON_VERSIONS = ["1.21.4", "1.21.1", "1.20.6", "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2"]
 
 LOADER_EMOJI = {"fabric": "🧵", "forge": "⚙️", "neoforge": "🔥", "quilt": "🧶", "vanilla": "🟩"}
