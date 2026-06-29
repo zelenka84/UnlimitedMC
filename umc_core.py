@@ -7,10 +7,15 @@ UnlimitedMC — ядро (вся логика без интерфейса).
 from __future__ import annotations
 
 import os
+import sys
 import json
 import uuid
 import base64
+import struct
+import shutil
 import hashlib
+import zipfile
+import tempfile
 import platform
 import subprocess
 from pathlib import Path
@@ -233,7 +238,8 @@ def install_for_instance(inst: dict, progress_cb) -> str:
 def build_command(inst: dict, cfg: dict) -> list[str]:
     launch_id = inst.get("launch_id") or inst["mc_version"]
     prof = cfg["profile"]
-    ram = int(cfg.get("ram_mb", 4096))
+    # RAM сборки важнее глобальной (0/пусто = брать глобальную из Настроек)
+    ram = int(inst.get("ram_mb") or cfg.get("ram_mb", 4096))
     options = {
         "username": prof.get("username", "Player"),
         "uuid": prof.get("uuid") or offline_uuid(prof.get("username", "Player")),
@@ -360,6 +366,183 @@ def delete_content_file(inst: dict, filename: str, subfolder: str) -> None:
     except OSError:
         pass  # файл занят/уже удалён — запись всё равно вычистим
     inst["mods"] = [m for m in inst.get("mods", []) if m.get("filename") != filename]
+
+
+# --------------------------------------------------------------------------- #
+#  Менеджер сборки: миры, сервера, скриншоты, открыть папку
+# --------------------------------------------------------------------------- #
+def open_in_os(path) -> None:
+    """Открыть файл/папку штатным средством ОС (проводник, просмотрщик и т.п.)."""
+    p = str(path)
+    try:
+        if sys.platform == "win32":
+            os.startfile(p)            # type: ignore[attr-defined]  # noqa
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", p])
+        else:
+            subprocess.Popen(["xdg-open", p])
+    except Exception:
+        pass
+
+
+def _dedup_dir(folder: Path, name: str) -> Path:
+    """Вернуть несуществующий путь folder/name, добавляя (2), (3)… при коллизии."""
+    dest = folder / name
+    i = 2
+    while dest.exists():
+        dest = folder / f"{name} ({i})"
+        i += 1
+    return dest
+
+
+# ---- Миры ----
+def list_worlds(inst: dict) -> list[dict]:
+    """Миры сборки — папки в saves/ (мир = папка, обычно с level.dat)."""
+    saves = instance_dir(inst) / "saves"
+    if not saves.exists():
+        return []
+    out = []
+    for d in sorted(saves.iterdir(), key=lambda x: x.name.lower()):
+        if d.is_dir():
+            out.append({"name": d.name, "folder": d.name,
+                        "has_level": (d / "level.dat").exists()})
+    return out
+
+
+def export_world(inst: dict, world_folder: str, dest_zip) -> Path:
+    """Запаковать мир в zip (внутри — папка мира, как ждут лаунчеры/импорт)."""
+    src = instance_dir(inst) / "saves" / world_folder
+    if not src.is_dir():
+        raise RuntimeError("Мир не найден")
+    dest = Path(dest_zip)
+    if dest.suffix.lower() != ".zip":
+        dest = dest.with_suffix(".zip")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in src.rglob("*"):
+            if f.is_file():
+                z.write(f, Path(world_folder) / f.relative_to(src))
+    return dest
+
+
+def import_world(inst: dict, src_zip) -> str:
+    """Распаковать zip с миром в saves/. Возвращает имя добавленного мира."""
+    saves = instance_dir(inst) / "saves"
+    saves.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmpd = Path(tmp)
+        with zipfile.ZipFile(src_zip) as z:
+            z.extractall(tmpd)
+        # ищем папку с level.dat — это корень мира
+        level = next((p for p in tmpd.rglob("level.dat")), None)
+        if level is not None:
+            world_root = level.parent
+            name = world_root.name if world_root != tmpd else Path(src_zip).stem
+        else:
+            # нет level.dat: берём единственную папку верхнего уровня, иначе сам zip
+            tops = [p for p in tmpd.iterdir() if p.is_dir()]
+            world_root = tops[0] if len(tops) == 1 else tmpd
+            name = world_root.name if world_root != tmpd else Path(src_zip).stem
+        dest = _dedup_dir(saves, name or "Импортированный мир")
+        shutil.copytree(world_root, dest)
+    return dest.name
+
+
+def delete_world(inst: dict, world_folder: str) -> None:
+    src = instance_dir(inst) / "saves" / world_folder
+    if src.is_dir():
+        shutil.rmtree(src, ignore_errors=True)
+
+
+# ---- Сервера (servers.dat — несжатый NBT) ----
+def _read_nbt(data: bytes):
+    """Минимальный разбор NBT (big-endian, несжатый). Возвращает (имя_корня, значение)."""
+    pos = 0
+
+    def u1():
+        nonlocal pos
+        v = data[pos]; pos += 1
+        return v
+
+    def take(n):
+        nonlocal pos
+        b = data[pos:pos + n]; pos += n
+        return b
+
+    def s2():
+        return struct.unpack(">H", take(2))[0]
+
+    def read_str():
+        return take(s2()).decode("utf-8", "replace")
+
+    def read_payload(tag):
+        nonlocal pos
+        if tag == 1:   return struct.unpack(">b", take(1))[0]
+        if tag == 2:   return struct.unpack(">h", take(2))[0]
+        if tag == 3:   return struct.unpack(">i", take(4))[0]
+        if tag == 4:   return struct.unpack(">q", take(8))[0]
+        if tag == 5:   return struct.unpack(">f", take(4))[0]
+        if tag == 6:   return struct.unpack(">d", take(8))[0]
+        if tag == 7:   return take(struct.unpack(">i", take(4))[0])           # byte array
+        if tag == 8:   return read_str()
+        if tag == 9:                                                          # list
+            it = u1(); ln = struct.unpack(">i", take(4))[0]
+            return [read_payload(it) for _ in range(ln)]
+        if tag == 10:                                                         # compound
+            obj = {}
+            while True:
+                t = u1()
+                if t == 0:
+                    break
+                nm = read_str()
+                obj[nm] = read_payload(t)
+            return obj
+        if tag == 11:  return [struct.unpack(">i", take(4))[0] for _ in range(struct.unpack(">i", take(4))[0])]
+        if tag == 12:  return [struct.unpack(">q", take(8))[0] for _ in range(struct.unpack(">i", take(4))[0])]
+        raise ValueError(f"Неизвестный NBT-тег {tag}")
+
+    root_tag = u1()
+    if root_tag != 10:
+        raise ValueError("Не NBT-compound в корне")
+    name = read_str()
+    return name, read_payload(10)
+
+
+def list_servers(inst: dict) -> list[dict]:
+    """Сохранённые сервера из servers.dat: список {name, ip}. Пусто при любой ошибке."""
+    path = instance_dir(inst) / "servers.dat"
+    if not path.exists():
+        return []
+    try:
+        _, root = _read_nbt(path.read_bytes())
+        servers = root.get("servers", []) if isinstance(root, dict) else []
+        return [{"name": s.get("name", ""), "ip": s.get("ip", "")}
+                for s in servers if isinstance(s, dict)]
+    except Exception:
+        return []
+
+
+# ---- Скриншоты ----
+_IMG_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+
+
+def list_screenshots(inst: dict) -> list[Path]:
+    """Скриншоты сборки (новые сверху) — файлы из screenshots/."""
+    folder = instance_dir(inst) / "screenshots"
+    if not folder.exists():
+        return []
+    files = [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in _IMG_EXT]
+    return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def delete_path(path) -> None:
+    """Удалить файл (скриншот и т.п.); без исключений наружу."""
+    try:
+        p = Path(path)
+        if p.is_file():
+            p.unlink()
+    except OSError:
+        pass
 
 
 def fetch_bytes(url: str, timeout: int = 20) -> bytes | None:

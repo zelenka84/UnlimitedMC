@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
 import umc_core as core
 import ui_content as C
 from ui_kit import (
-    Logo, Ambient, Clickable, Toggle, FlowLayout, build_qss, nav_icon, win_icon,
+    Logo, Ambient, Clickable, Toggle, FlowLayout, build_qss, nav_icon, win_icon, ui_icon,
     fade_widget, stagger_in, raise_on_hover, glow_on_hover,
     THEMES, ACCENTS, SOURCE_ACCENT,
 )
@@ -389,23 +389,25 @@ class CreateInstanceDialog(QDialog):
 
 
 # --------------------------------------------------------------------------- #
-#  Моды сборки — просмотр и удаление (истина = файлы на диске)
+#  Менеджер сборки — настройки, контент, миры, сервера, скриншоты
 # --------------------------------------------------------------------------- #
-class ManageModsDialog(QDialog):
-    """Список модов/паков/шейдеров сборки по файлам на диске. Удалить можно любой —
-    в том числе мод, добавленный в папку mods вручную (его нет в списке лаунчера)."""
-    _EMOJI = {"mod": "🧩", "resourcepack": "🖼", "shader": "✨"}
+class InstanceManagerDialog(QDialog):
+    """Одно окно для всей сборки: настройки, установленный контент (моды/паки/
+    шейдеры по файлам на диске), миры (импорт/экспорт), сохранённые сервера и
+    скриншоты. Истина по файлам — диск, поэтому видно и добавленное вручную."""
 
     def __init__(self, win, inst):
         super().__init__(win)
         self.win = win
         self.inst = inst
+        tok = THEMES[win.theme]
+        self.c_muted, self.c_text, self.c_accent = tok["muted"], tok["text"], win.accent
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setModal(True)
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(20, 20, 20, 20)
-
         card = QFrame()
         card.setObjectName("msgCard")
         shadow = QGraphicsDropShadowEffect(card)
@@ -418,91 +420,218 @@ class ManageModsDialog(QDialog):
         outer.addWidget(card)
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(24, 22, 24, 20)
-        v.setSpacing(13)
+        v.setContentsMargins(22, 20, 22, 18)
+        v.setSpacing(14)
 
-        title = QLabel(win.L(f"Моды — {inst['name']}", f"Mods — {inst['name']}"))
+        head = QHBoxLayout()
+        title = QLabel(win.L(f"Сборка — {inst['name']}", f"Instance — {inst['name']}"))
         title.setObjectName("msgTitle")
         title.setWordWrap(True)
-        v.addWidget(title)
-        hint = QLabel(win.L(
-            "Список собран по файлам в папках сборки. Удалить можно любой — даже добавленный вручную.",
-            "Built from the files in this instance’s folders. You can delete any — even ones added manually."))
-        hint.setObjectName("msgText")
-        hint.setWordWrap(True)
-        v.addWidget(hint)
+        head.addWidget(title, 1)
+        close = QPushButton(win.L("Закрыть", "Close"))
+        close.setObjectName("ghost")
+        close.clicked.connect(self.accept)
+        head.addWidget(close, 0, Qt.AlignTop)
+        v.addLayout(head)
 
-        self.list_box = QVBoxLayout()
-        self.list_box.setSpacing(8)
+        body = QHBoxLayout()
+        body.setSpacing(16)
+        nav = QVBoxLayout()
+        nav.setSpacing(4)
+        self.stack = QStackedWidget()
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
+
+        sections = [
+            ("settings", "Настройки", "Settings", self._page_settings),
+            ("content",  "Контент",   "Content",  self._page_content),
+            ("worlds",   "Миры",      "Worlds",   self._page_worlds),
+            ("servers",  "Сервера",   "Servers",  self._page_servers),
+            ("shots",    "Скриншоты", "Screenshots", self._page_shots),
+        ]
+        for i, (key, ru, en, builder) in enumerate(sections):
+            btn = QPushButton("  " + win.L(ru, en))
+            btn.setObjectName("mgrNav")
+            btn.setCheckable(True)
+            btn.setIcon(ui_icon(key, self.c_muted, 17))
+            btn.setIconSize(QSize(17, 17))
+            btn.setMinimumWidth(176)
+            btn.clicked.connect(lambda _=False, idx=i: self.stack.setCurrentIndex(idx))
+            self._group.addButton(btn)
+            nav.addWidget(btn)
+            self.stack.addWidget(builder())
+            if i == 0:
+                btn.setChecked(True)
+        nav.addStretch(1)
+        nav_host = QWidget()
+        nav_host.setLayout(nav)
+        nav_host.setFixedWidth(190)
+        body.addWidget(nav_host, 0)
+        body.addWidget(self.stack, 1)
+        v.addLayout(body, 1)
+
+        self.setMinimumSize(820, 580)
+        self._fill_content()
+        self._fill_worlds()
+        self._fill_servers()
+        self._fill_shots()
+
+    # ---------- мелкие помощники ----------
+    def _ic(self, key, color=None, size=18):
+        lab = QLabel()
+        lab.setPixmap(ui_icon(key, color or self.c_muted, size).pixmap(QSize(size, size)))
+        lab.setStyleSheet("background:transparent;")
+        return lab
+
+    def _icon_btn(self, key, ru, en, color, *, danger=False, primary=False):
+        b = QPushButton("  " + self.win.L(ru, en))
+        b.setObjectName("remove" if danger else ("primary" if primary else "ghost"))
+        b.setIcon(ui_icon(key, color, 15))
+        b.setIconSize(QSize(15, 15))
+        return b
+
+    def _list_section(self, intro_ru, intro_en, top_widget=None):
+        """Каркас раздела со списком: заголовок-подсказка + (опц. кнопка) + скролл."""
+        page = QWidget()
+        pv = QVBoxLayout(page)
+        pv.setContentsMargins(2, 0, 2, 0)
+        pv.setSpacing(12)
+        intro = QLabel(self.win.L(intro_ru, intro_en))
+        intro.setObjectName("muted")
+        intro.setWordWrap(True)
+        if top_widget is not None:
+            head = QHBoxLayout()
+            head.addWidget(intro, 1)
+            head.addWidget(top_widget, 0)
+            pv.addLayout(head)
+        else:
+            pv.addWidget(intro)
+        box = QVBoxLayout()
+        box.setSpacing(8)
         host = QWidget()
-        host.setLayout(self.list_box)
+        host.setLayout(box)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setWidget(host)
-        scroll.setMinimumHeight(150)
-        scroll.setMaximumHeight(360)
-        v.addWidget(scroll)
+        pv.addWidget(scroll, 1)
+        return page, box
 
-        row = QHBoxLayout()
-        row.addStretch(1)
-        close = QPushButton(win.L("Закрыть", "Close"))
-        close.setObjectName("primary")
-        close.clicked.connect(self.accept)
-        row.addWidget(close)
-        v.addLayout(row)
-
-        self.setMinimumWidth(480)
-        self._render()
-
-    def _render(self):
-        while self.list_box.count():
-            it = self.list_box.takeAt(0)
+    @staticmethod
+    def _clear(box):
+        while box.count():
+            it = box.takeAt(0)
             if it.widget():
                 it.widget().deleteLater()
-        files = core.instance_mods_on_disk(self.inst)
-        if not files:
-            empty = QLabel(self.win.L("В папках сборки пока нет модов.",
-                                      "No mods in this instance’s folders yet."))
-            empty.setObjectName("muted")
-            empty.setWordWrap(True)
-            self.list_box.addWidget(empty)
-            return
-        for f in files:
-            self.list_box.addWidget(self._row(f))
-        self.list_box.addStretch(1)
 
-    def _row(self, f):
+    def _empty(self, box, ru, en):
+        lab = QLabel(self.win.L(ru, en))
+        lab.setObjectName("muted")
+        lab.setWordWrap(True)
+        box.addWidget(lab)
+
+    def _row(self, icon_key, title, subtitle, buttons):
         row = QFrame()
-        row.setObjectName("inst")          # та же плитка-карточка, что и у сборок
+        row.setObjectName("inst")
         rl = QHBoxLayout(row)
         rl.setContentsMargins(13, 10, 13, 10)
         rl.setSpacing(11)
-        emo = QLabel(self._EMOJI.get(f["type"], "🧩"))
-        emo.setStyleSheet("font-size:20px;background:transparent;")
-        rl.addWidget(emo, 0, Qt.AlignTop)
+        rl.addWidget(self._ic(icon_key), 0, Qt.AlignVCenter)
         box = QVBoxLayout()
         box.setSpacing(2)
-        nm = QLabel(f["name"])
+        nm = QLabel(title)
         nm.setObjectName("newsTitle")
         nm.setWordWrap(True)
-        if f["source"] == "manual":
-            src = self.win.L("добавлен вручную", "added manually")
-        else:
-            src = self.win.L(f"из лаунчера · {f['source']}", f"from launcher · {f['source']}")
-        sub = QLabel(f'{src} · {f["filename"]}')
-        sub.setObjectName("muted")
-        sub.setWordWrap(True)
         box.addWidget(nm)
-        box.addWidget(sub)
+        if subtitle:
+            sub = QLabel(subtitle)
+            sub.setObjectName("muted")
+            sub.setWordWrap(True)
+            box.addWidget(sub)
         rl.addLayout(box, 1)
-        rm = QPushButton("🗑  " + C.T[self.win.lang]["remove"])
-        rm.setObjectName("remove")
-        rm.clicked.connect(lambda _=False, ff=f: self._delete(ff))
-        rl.addWidget(rm, 0, Qt.AlignTop)
+        for b in buttons:
+            rl.addWidget(b, 0, Qt.AlignVCenter)
         return row
 
-    def _delete(self, f):
+    # ---------- Настройки ----------
+    def _page_settings(self):
+        page = QWidget()
+        f = QFormLayout(page)
+        f.setContentsMargins(2, 4, 2, 0)
+        f.setSpacing(12)
+        self.s_name = QLineEdit(self.inst["name"])
+        f.addRow(self.win.L("Название", "Name"), self.s_name)
+        info = QLabel(f'{self.inst["loader"]} · {self.inst["mc_version"]}')
+        info.setObjectName("muted")
+        f.addRow(self.win.L("Загрузчик и версия", "Loader & version"), info)
+        self.s_ram = QSpinBox()
+        self.s_ram.setRange(0, 65536)
+        self.s_ram.setSingleStep(512)
+        self.s_ram.setSuffix(" MB")
+        self.s_ram.setValue(int(self.inst.get("ram_mb") or 0))
+        f.addRow(self.win.L("Память сборки (0 = общая)", "Instance RAM (0 = global)"), self.s_ram)
+
+        save = QPushButton(self.win.L("Сохранить", "Save"))
+        save.setObjectName("primary")
+        save.clicked.connect(self._save_settings)
+        openf = self._icon_btn("folder", "Открыть папку", "Open folder", self.c_muted)
+        openf.clicked.connect(lambda: core.open_in_os(core.instance_dir(self.inst)))
+        r1 = QHBoxLayout()
+        r1.addWidget(save)
+        r1.addWidget(openf)
+        r1.addStretch(1)
+        f.addRow(r1)
+
+        danger = self._icon_btn("trash", "Удалить сборку", "Delete instance", "#FF5C7A", danger=True)
+        danger.clicked.connect(self._delete_instance)
+        f.addRow(QLabel(""), danger)
+        return page
+
+    def _save_settings(self):
+        self.inst["name"] = self.s_name.text().strip() or self.inst["name"]
+        self.inst["ram_mb"] = int(self.s_ram.value())
+        core.save_config(self.win.cfg)
+        self.win.refresh_instances()
+        self.win.toast(self.win.L("Сборка сохранена", "Instance saved"))
+
+    def _delete_instance(self):
+        if not self.win.msg_confirm(
+                self.win.L("Удалить сборку", "Delete instance"),
+                self.win.L(f'Удалить сборку «{self.inst["name"]}»? Это действие необратимо.',
+                           f'Delete instance “{self.inst["name"]}”? This cannot be undone.')):
+            return
+        core.remove_instance(self.win.cfg, self.inst["id"])
+        core.save_config(self.win.cfg)
+        self.win.refresh_instances()
+        self.accept()
+
+    # ---------- Контент (моды/паки/шейдеры) ----------
+    def _page_content(self):
+        page, self._content_box = self._list_section(
+            "Моды, ресурспаки и шейдеры — по файлам в папках сборки. Удалить можно любой, даже добавленный вручную.",
+            "Mods, resource packs and shaders found on disk. You can delete any — even ones added manually.")
+        return page
+
+    def _fill_content(self):
+        self._clear(self._content_box)
+        files = core.instance_mods_on_disk(self.inst)
+        if not files:
+            self._empty(self._content_box, "В папках сборки пока нет модов.",
+                        "No content in this instance’s folders yet.")
+            return
+        ikey = {"mod": "content", "resourcepack": "shots", "shader": "worlds"}
+        for fobj in files:
+            if fobj["source"] == "manual":
+                src = self.win.L("добавлен вручную", "added manually")
+            else:
+                src = self.win.L(f"из лаунчера · {fobj['source']}", f"from launcher · {fobj['source']}")
+            rm = self._icon_btn("trash", "Удалить", "Remove", "#FF5C7A", danger=True)
+            rm.clicked.connect(lambda _=False, ff=fobj: self._del_content(ff))
+            self._content_box.addWidget(self._row(
+                ikey.get(fobj["type"], "content"), fobj["name"], f'{src} · {fobj["filename"]}', [rm]))
+        self._content_box.addStretch(1)
+
+    def _del_content(self, f):
         if not self.win.msg_confirm(
                 self.win.L("Удалить мод?", "Remove mod?"),
                 self.win.L(f"Удалить файл «{f['filename']}» из сборки?\nОн будет удалён с диска.",
@@ -510,7 +639,165 @@ class ManageModsDialog(QDialog):
             return
         core.delete_content_file(self.inst, f["filename"], f["subfolder"])
         core.save_config(self.win.cfg)
-        self._render()
+        self._fill_content()
+        self.win.refresh_instances()
+
+    # ---------- Миры ----------
+    def _page_worlds(self):
+        imp = self._icon_btn("import", "Импорт мира", "Import world", "#FFFFFF", primary=True)
+        imp.clicked.connect(self._import_world)
+        page, self._worlds_box = self._list_section(
+            "Сохранённые миры этой сборки. Можно экспортировать в .zip, импортировать чужой или удалить.",
+            "Saved worlds of this instance. Export to .zip, import another, or delete.", top_widget=imp)
+        return page
+
+    def _fill_worlds(self):
+        self._clear(self._worlds_box)
+        worlds = core.list_worlds(self.inst)
+        if not worlds:
+            self._empty(self._worlds_box, "В этой сборке пока нет миров.",
+                        "This instance has no worlds yet.")
+            return
+        for w in worlds:
+            sub = "" if w["has_level"] else self.win.L("нет level.dat", "no level.dat")
+            exp = self._icon_btn("export", "Экспорт", "Export", self.c_muted)
+            exp.clicked.connect(lambda _=False, ww=w: self._export_world(ww))
+            rm = self._icon_btn("trash", "Удалить", "Delete", "#FF5C7A", danger=True)
+            rm.clicked.connect(lambda _=False, ww=w: self._delete_world(ww))
+            self._worlds_box.addWidget(self._row("worlds", w["name"], sub, [exp, rm]))
+        self._worlds_box.addStretch(1)
+
+    def _import_world(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.win.L("Импорт мира", "Import world"), "", "Zip (*.zip)")
+        if not path:
+            return
+        try:
+            name = core.import_world(self.inst, path)
+            self._fill_worlds()
+            self.win.refresh_instances()
+            self.win.toast(self.win.L(f"Мир добавлен: {name}", f"World added: {name}"))
+        except Exception as e:  # noqa: BLE001
+            self.win.on_error(str(e))
+
+    def _export_world(self, w):
+        path, _ = QFileDialog.getSaveFileName(
+            self, self.win.L("Экспорт мира", "Export world"), f'{w["name"]}.zip', "Zip (*.zip)")
+        if not path:
+            return
+        try:
+            dest = core.export_world(self.inst, w["folder"], path)
+            self.win.toast(self.win.L(f"Мир сохранён: {dest.name}", f"World saved: {dest.name}"))
+        except Exception as e:  # noqa: BLE001
+            self.win.on_error(str(e))
+
+    def _delete_world(self, w):
+        if not self.win.msg_confirm(
+                self.win.L("Удалить мир?", "Delete world?"),
+                self.win.L(f"Удалить мир «{w['name']}»? Это действие необратимо.",
+                           f"Delete world “{w['name']}”? This cannot be undone.")):
+            return
+        core.delete_world(self.inst, w["folder"])
+        self._fill_worlds()
+
+    # ---------- Сервера ----------
+    def _page_servers(self):
+        page, self._servers_box = self._list_section(
+            "Сервера, сохранённые в игре (servers.dat).",
+            "Servers saved in-game (servers.dat).")
+        return page
+
+    def _fill_servers(self):
+        self._clear(self._servers_box)
+        servers = core.list_servers(self.inst)
+        if not servers:
+            self._empty(self._servers_box, "Нет сохранённых серверов.", "No saved servers.")
+            return
+        for s in servers:
+            self._servers_box.addWidget(self._row(
+                "servers", s["name"] or s["ip"] or "—", s["ip"], []))
+        self._servers_box.addStretch(1)
+
+    # ---------- Скриншоты ----------
+    def _page_shots(self):
+        page = QWidget()
+        pv = QVBoxLayout(page)
+        pv.setContentsMargins(2, 0, 2, 0)
+        pv.setSpacing(12)
+        intro = QLabel(self.win.L("Скриншоты из игры. Клик — открыть, корзина — удалить.",
+                                  "In-game screenshots. Click to open, trash to delete."))
+        intro.setObjectName("muted")
+        intro.setWordWrap(True)
+        pv.addWidget(intro)
+        self._shots_flow = FlowLayout(hspacing=12, vspacing=12)
+        host = QWidget()
+        host.setLayout(self._shots_flow)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(host)
+        pv.addWidget(scroll, 1)
+        return page
+
+    def _fill_shots(self):
+        while self._shots_flow.count():
+            it = self._shots_flow.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        shots = core.list_screenshots(self.inst)
+        if not shots:
+            self._empty_flow = QLabel(self.win.L("Скриншотов пока нет.", "No screenshots yet."))
+            self._empty_flow.setObjectName("muted")
+            self._shots_flow.addWidget(self._empty_flow)
+            return
+        for p in shots:
+            self._shots_flow.addWidget(self._shot_card(p))
+
+    def _shot_card(self, path):
+        card = QFrame()
+        card.setObjectName("shot")
+        card.setFixedWidth(184)
+        cv = QVBoxLayout(card)
+        cv.setContentsMargins(8, 8, 8, 8)
+        cv.setSpacing(7)
+        thumb = Clickable()
+        thumb.setCursor(Qt.PointingHandCursor)
+        tl = QVBoxLayout(thumb)
+        tl.setContentsMargins(0, 0, 0, 0)
+        img = QLabel()
+        pm = QPixmap(str(path))
+        if not pm.isNull():
+            img.setPixmap(pm.scaledToWidth(168, Qt.SmoothTransformation))
+        else:
+            img.setText("🖼")
+        img.setAlignment(Qt.AlignCenter)
+        img.setFixedHeight(98)
+        img.setStyleSheet("background:transparent;")
+        tl.addWidget(img)
+        thumb.clicked.connect(lambda _=path: core.open_in_os(path))
+        cv.addWidget(thumb)
+        row = QHBoxLayout()
+        nm = QLabel(path.name)
+        nm.setObjectName("muted")
+        nm.setWordWrap(False)
+        row.addWidget(nm, 1)
+        rm = QPushButton()
+        rm.setObjectName("ghost")
+        rm.setFixedWidth(30)
+        rm.setIcon(ui_icon("trash", "#FF5C7A", 15))
+        rm.setIconSize(QSize(15, 15))
+        rm.clicked.connect(lambda _=False, p=path: self._delete_shot(p))
+        row.addWidget(rm, 0)
+        cv.addLayout(row)
+        return card
+
+    def _delete_shot(self, path):
+        if not self.win.msg_confirm(
+                self.win.L("Удалить скриншот?", "Delete screenshot?"),
+                self.win.L(f"Удалить «{path.name}»?", f"Delete “{path.name}”?")):
+            return
+        core.delete_path(path)
+        self._fill_shots()
 
     def showEvent(self, e):
         super().showEvent(e)
@@ -1292,19 +1579,15 @@ class MainWindow(QMainWindow):
         launch.setObjectName("launch")
         launch.clicked.connect(lambda _=False, i=inst: self.launch_instance(i))
         self._glow(launch)
-        mods = QPushButton("🧩")
-        mods.setObjectName("ghost")
-        mods.setFixedWidth(38)
-        mods.setToolTip(self.L("Моды сборки", "Instance mods"))
-        mods.clicked.connect(lambda _=False, i=inst: self.manage_mods(i))
-        delete = QPushButton("🗑")
-        delete.setObjectName("ghost")
-        delete.setFixedWidth(38)
-        delete.setToolTip(self.L("Удалить сборку", "Delete instance"))
-        delete.clicked.connect(lambda _=False, i=inst: self.delete_instance(i))
+        manager = QPushButton()
+        manager.setObjectName("ghost")
+        manager.setFixedWidth(40)
+        manager.setToolTip(self.L("Менеджер сборки", "Instance manager"))
+        manager.setIcon(ui_icon("manager", THEMES[self.theme]["muted"], 17))
+        manager.setIconSize(QSize(17, 17))
+        manager.clicked.connect(lambda _=False, i=inst: self.open_manager(i))
         actions.addWidget(launch, 1)
-        actions.addWidget(mods)
-        actions.addWidget(delete)
+        actions.addWidget(manager)
         body.addLayout(actions)
         bw = QWidget()
         bw.setLayout(body)
@@ -1373,19 +1656,9 @@ class MainWindow(QMainWindow):
         except Exception as e:  # noqa: BLE001
             self.on_error(str(e))
 
-    def manage_mods(self, inst):
-        ManageModsDialog(self, inst).exec()
-        self.refresh_instances()   # счётчик модов мог измениться
-
-    def delete_instance(self, inst):
-        if not self.msg_confirm(
-            self.L("Удалить сборку", "Delete instance"),
-            self.L(f'Удалить сборку «{inst["name"]}»? Это действие необратимо.',
-                   f'Delete instance “{inst["name"]}”? This cannot be undone.')):
-            return
-        core.remove_instance(self.cfg, inst["id"])
-        core.save_config(self.cfg)
-        self.refresh_instances()
+    def open_manager(self, inst):
+        InstanceManagerDialog(self, inst).exec()
+        self.refresh_instances()   # имя/RAM/счётчик модов могли измениться
 
     def launch_instance(self, inst):
         if self.busy:

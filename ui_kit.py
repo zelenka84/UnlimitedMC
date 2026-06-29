@@ -332,6 +332,46 @@ def win_icon(name: str, color: str, size: int = 14) -> QIcon:
     return QIcon(render_svg(_icon_svg(WIN_ICONS[name], color, False), size))
 
 
+# Иконки интерфейса (кнопки/разделы). Векторные — чтобы не зависеть от того,
+# рисует ли система цветные эмодзи (🧩/🗑 на части машин не отображались).
+UI_ICONS = {
+    "manager":  '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>'
+                '<line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>'
+                '<line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>'
+                '<line x1="2" y1="14" x2="6" y2="14"/><line x1="10" y1="8" x2="14" y2="8"/>'
+                '<line x1="18" y1="16" x2="22" y2="16"/>',
+    "settings": NAV_ICONS["settings"][0],
+    "content":  '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8'
+                'a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>'
+                '<path d="M3.27 6.96 12 12.01l8.73-5.05"/><path d="M12 22.08V12"/>',
+    "worlds":   '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>'
+                '<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10'
+                ' 15.3 15.3 0 0 1 4-10z"/>',
+    "servers":  '<rect x="2" y="2" width="20" height="8" rx="2"/>'
+                '<rect x="2" y="14" width="20" height="8" rx="2"/>'
+                '<line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+    "shots":    '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/>'
+                '<path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
+    "trash":    '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4'
+                'a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/>'
+                '<line x1="14" y1="11" x2="14" y2="17"/>',
+    "folder":   '<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2'
+                'A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>',
+    "export":   '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
+                '<polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    "import":   '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
+                '<polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+    "open":     '<path d="M15 3h6v6"/><path d="M10 14 21 3"/>'
+                '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+}
+
+
+@functools.lru_cache(maxsize=256)
+def ui_icon(key: str, color: str, size: int = 16) -> QIcon:
+    """Векторная иконка интерфейса нужного цвета (кэш по ключ/цвет/размер)."""
+    return QIcon(render_svg(_icon_svg(UI_ICONS[key], color, False), size))
+
+
 # --------------------------------------------------------------------------- #
 #  Логотип-виджет (перерисовывается при смене акцента)
 # --------------------------------------------------------------------------- #
@@ -649,6 +689,12 @@ QPushButton#pageCur {{ background:{g}; border:none; border-radius:8px;
 QPushButton#segopt {{ background:transparent; border:none; border-radius:8px; padding:8px 16px;
     color:{muted}; font-weight:600; }}
 QPushButton#segopt:checked {{ background:{accent_soft}; color:{text}; }}
+QPushButton#mgrNav {{ background:transparent; border:none; border-radius:9px; padding:9px 13px;
+    color:{muted}; font-weight:600; text-align:left; }}
+QPushButton#mgrNav:hover {{ color:{text}; background:{surface}; }}
+QPushButton#mgrNav:checked {{ background:{accent_soft}; color:{text}; }}
+QFrame#shot {{ background:{surface}; border:1px solid {border}; border-radius:10px; }}
+QFrame#shot:hover {{ border:1px solid {border_strong}; }}
 QPushButton#chip {{ background:{surface}; border:1px solid {border}; border-radius:999px;
     padding:8px 15px; color:{muted}; font-weight:500; }}
 QPushButton#chip:hover {{ color:{text}; }}
