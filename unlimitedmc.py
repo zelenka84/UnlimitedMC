@@ -389,6 +389,141 @@ class CreateInstanceDialog(QDialog):
 
 
 # --------------------------------------------------------------------------- #
+#  Моды сборки — просмотр и удаление (истина = файлы на диске)
+# --------------------------------------------------------------------------- #
+class ManageModsDialog(QDialog):
+    """Список модов/паков/шейдеров сборки по файлам на диске. Удалить можно любой —
+    в том числе мод, добавленный в папку mods вручную (его нет в списке лаунчера)."""
+    _EMOJI = {"mod": "🧩", "resourcepack": "🖼", "shader": "✨"}
+
+    def __init__(self, win, inst):
+        super().__init__(win)
+        self.win = win
+        self.inst = inst
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setModal(True)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(20, 20, 20, 20)
+
+        card = QFrame()
+        card.setObjectName("msgCard")
+        shadow = QGraphicsDropShadowEffect(card)
+        shadow.setBlurRadius(48)
+        shadow.setOffset(0, 18)
+        sc = QColor(0, 0, 0)
+        sc.setAlphaF(0.5)
+        shadow.setColor(sc)
+        card.setGraphicsEffect(shadow)
+        outer.addWidget(card)
+
+        v = QVBoxLayout(card)
+        v.setContentsMargins(24, 22, 24, 20)
+        v.setSpacing(13)
+
+        title = QLabel(win.L(f"Моды — {inst['name']}", f"Mods — {inst['name']}"))
+        title.setObjectName("msgTitle")
+        title.setWordWrap(True)
+        v.addWidget(title)
+        hint = QLabel(win.L(
+            "Список собран по файлам в папках сборки. Удалить можно любой — даже добавленный вручную.",
+            "Built from the files in this instance’s folders. You can delete any — even ones added manually."))
+        hint.setObjectName("msgText")
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+
+        self.list_box = QVBoxLayout()
+        self.list_box.setSpacing(8)
+        host = QWidget()
+        host.setLayout(self.list_box)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(host)
+        scroll.setMinimumHeight(150)
+        scroll.setMaximumHeight(360)
+        v.addWidget(scroll)
+
+        row = QHBoxLayout()
+        row.addStretch(1)
+        close = QPushButton(win.L("Закрыть", "Close"))
+        close.setObjectName("primary")
+        close.clicked.connect(self.accept)
+        row.addWidget(close)
+        v.addLayout(row)
+
+        self.setMinimumWidth(480)
+        self._render()
+
+    def _render(self):
+        while self.list_box.count():
+            it = self.list_box.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        files = core.instance_mods_on_disk(self.inst)
+        if not files:
+            empty = QLabel(self.win.L("В папках сборки пока нет модов.",
+                                      "No mods in this instance’s folders yet."))
+            empty.setObjectName("muted")
+            empty.setWordWrap(True)
+            self.list_box.addWidget(empty)
+            return
+        for f in files:
+            self.list_box.addWidget(self._row(f))
+        self.list_box.addStretch(1)
+
+    def _row(self, f):
+        row = QFrame()
+        row.setObjectName("inst")          # та же плитка-карточка, что и у сборок
+        rl = QHBoxLayout(row)
+        rl.setContentsMargins(13, 10, 13, 10)
+        rl.setSpacing(11)
+        emo = QLabel(self._EMOJI.get(f["type"], "🧩"))
+        emo.setStyleSheet("font-size:20px;background:transparent;")
+        rl.addWidget(emo, 0, Qt.AlignTop)
+        box = QVBoxLayout()
+        box.setSpacing(2)
+        nm = QLabel(f["name"])
+        nm.setObjectName("newsTitle")
+        nm.setWordWrap(True)
+        if f["source"] == "manual":
+            src = self.win.L("добавлен вручную", "added manually")
+        else:
+            src = self.win.L(f"из лаунчера · {f['source']}", f"from launcher · {f['source']}")
+        sub = QLabel(f'{src} · {f["filename"]}')
+        sub.setObjectName("muted")
+        sub.setWordWrap(True)
+        box.addWidget(nm)
+        box.addWidget(sub)
+        rl.addLayout(box, 1)
+        rm = QPushButton("🗑  " + C.T[self.win.lang]["remove"])
+        rm.setObjectName("remove")
+        rm.clicked.connect(lambda _=False, ff=f: self._delete(ff))
+        rl.addWidget(rm, 0, Qt.AlignTop)
+        return row
+
+    def _delete(self, f):
+        if not self.win.msg_confirm(
+                self.win.L("Удалить мод?", "Remove mod?"),
+                self.win.L(f"Удалить файл «{f['filename']}» из сборки?\nОн будет удалён с диска.",
+                           f"Delete “{f['filename']}” from this instance?\nThe file will be removed from disk.")):
+            return
+        core.delete_content_file(self.inst, f["filename"], f["subfolder"])
+        core.save_config(self.win.cfg)
+        self._render()
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        par = self.parentWidget()
+        if par is not None:
+            c = par.frameGeometry().center()
+            self.move(c.x() - self.width() // 2, c.y() - self.height() // 2)
+        if not getattr(self, "_faded", False):
+            self._faded = True
+            fade_widget(self, duration=180, start=0.0)
+
+
+# --------------------------------------------------------------------------- #
 #  Онбординг (первый запуск) — в стиле темы
 # --------------------------------------------------------------------------- #
 class OnboardingDialog(QDialog):
@@ -801,9 +936,18 @@ class MainWindow(QMainWindow):
     def L(self, ru, en):
         return en if self.lang == "en" else ru
 
-    def _glow(self, btn):
-        """Навесить на кнопку анимированное свечение/нажатие и запомнить для смены акцента."""
-        self._glows.append(glow_on_hover(btn, self.effective_accent()))
+    def _glow(self, btn, color=None):
+        """Навесить на кнопку анимированное свечение/нажатие.
+
+        По умолчанию — под акцент раздела (запоминаем, чтобы перекрасить при смене
+        акцента). Если задан ``color`` — фиксированный цвет (напр. красный у кнопки
+        удаления): такое свечение в список акцентных не попадает и не зеленеет на
+        Modrinth/CurseForge.
+        """
+        if color is None:
+            self._glows.append(glow_on_hover(btn, self.effective_accent()))
+        else:
+            glow_on_hover(btn, color)
         return btn
 
     # --- стилизованные окна-сообщения (вместо стандартного QMessageBox) ---
@@ -1136,7 +1280,7 @@ class MainWindow(QMainWindow):
         body.setSpacing(3)
         name = QLabel(inst["name"])
         name.setObjectName("newsTitle")
-        n = len(inst.get("mods", []))
+        n = core.count_instance_mods(inst)   # реальные файлы в папке mods, не список лаунчера
         meta = QLabel(f'{inst["loader"]} · {inst["mc_version"]} · {n} {C.T[self.lang]["mods"]}')
         meta.setObjectName("muted")
         body.addWidget(name)
@@ -1148,11 +1292,18 @@ class MainWindow(QMainWindow):
         launch.setObjectName("launch")
         launch.clicked.connect(lambda _=False, i=inst: self.launch_instance(i))
         self._glow(launch)
+        mods = QPushButton("🧩")
+        mods.setObjectName("ghost")
+        mods.setFixedWidth(38)
+        mods.setToolTip(self.L("Моды сборки", "Instance mods"))
+        mods.clicked.connect(lambda _=False, i=inst: self.manage_mods(i))
         delete = QPushButton("🗑")
         delete.setObjectName("ghost")
         delete.setFixedWidth(38)
+        delete.setToolTip(self.L("Удалить сборку", "Delete instance"))
         delete.clicked.connect(lambda _=False, i=inst: self.delete_instance(i))
         actions.addWidget(launch, 1)
+        actions.addWidget(mods)
         actions.addWidget(delete)
         body.addLayout(actions)
         bw = QWidget()
@@ -1221,6 +1372,10 @@ class MainWindow(QMainWindow):
                 self.toast(self.L("Сборка создана", "Instance created"))
         except Exception as e:  # noqa: BLE001
             self.on_error(str(e))
+
+    def manage_mods(self, inst):
+        ManageModsDialog(self, inst).exec()
+        self.refresh_instances()   # счётчик модов мог измениться
 
     def delete_instance(self, inst):
         if not self.msg_confirm(
@@ -1558,12 +1713,13 @@ class MainWindow(QMainWindow):
                     b.setObjectName("remove")
                     b.clicked.connect(lambda _=False: self.remove_project(
                         source, it, target_getter(), refresh_action))
+                    self._glow(b, color="#FF5C7A")   # красное свечение под цвет кнопки
                 else:
                     b = QPushButton(C.T[self.lang]["install"])
                     b.setObjectName("install")
                     b.clicked.connect(lambda _=False: self.install_project(
                         source, it, ptype, target_getter(), refresh_action))
-                self._glow(b)
+                    self._glow(b)
                 action.addWidget(b)
             except RuntimeError:
                 pass  # карточку могли удалить новым поиском, пока шла установка

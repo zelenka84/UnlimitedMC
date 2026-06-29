@@ -311,6 +311,57 @@ def remove_mod(inst: dict, entry: dict, progress_cb=None) -> dict:
     return entry
 
 
+# Папки контента сборки → тип проекта (для отображения и подсчёта).
+CONTENT_FOLDERS = {"mods": "mod", "resourcepacks": "resourcepack", "shaderpacks": "shader"}
+
+
+def count_instance_mods(inst: dict) -> int:
+    """Сколько модов реально лежит в папке mods сборки (а не в списке лаунчера)."""
+    folder = instance_dir(inst) / "mods"
+    if not folder.exists():
+        return 0
+    return sum(1 for p in folder.iterdir() if p.is_file())
+
+
+def instance_mods_on_disk(inst: dict) -> list[dict]:
+    """Все моды/паки/шейдеры, реально лежащие в папках сборки.
+
+    Истина — файлы на диске (включая добавленные пользователем вручную). Имя и
+    источник подтягиваем из списка лаунчера по имени файла, если запись есть;
+    для ручных файлов источник — ``manual``.
+    """
+    tracked = {m.get("filename"): m for m in inst.get("mods", []) if m.get("filename")}
+    base = instance_dir(inst)
+    out: list[dict] = []
+    for sub, ptype in CONTENT_FOLDERS.items():
+        folder = base / sub
+        if not folder.exists():
+            continue
+        for p in sorted(folder.iterdir(), key=lambda x: x.name.lower()):
+            if not p.is_file():
+                continue
+            meta = tracked.get(p.name) or {}
+            out.append({
+                "filename": p.name,
+                "subfolder": sub,
+                "type": ptype,
+                "name": meta.get("name") or p.name,
+                "source": meta.get("source") or "manual",
+            })
+    return out
+
+
+def delete_content_file(inst: dict, filename: str, subfolder: str) -> None:
+    """Удалить файл контента сборки с диска и убрать запись из списка лаунчера."""
+    p = instance_dir(inst) / subfolder / filename
+    try:
+        if p.exists():
+            p.unlink()
+    except OSError:
+        pass  # файл занят/уже удалён — запись всё равно вычистим
+    inst["mods"] = [m for m in inst.get("mods", []) if m.get("filename") != filename]
+
+
 def fetch_bytes(url: str, timeout: int = 20) -> bytes | None:
     """Скачать небольшой ресурс целиком (иконку мода и т.п.). None при любой ошибке.
 
